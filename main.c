@@ -3,10 +3,18 @@
 #include <unistd.h>
 #include <termios.h>
 
+/// Rozmery plochy
 #define N 50
-#define M 20
+#define M 15
 
-int field[20][50] = {0};
+int field[15][50] = {0}; /// Pozicia pre hraca 1
+int direction = 2; /// Smer pohybu (1-4 clockwise)
+int head = 5;
+int tail = 1;
+int y = 1;
+int x = 6;
+
+int play = 0;
 
 void set_mode(int want_key)
 {
@@ -43,13 +51,13 @@ int get_key()
 void print() {
     for(int i=0;i<=M;i++){
         for (int j = 0; j <= N; ++j) {
-            if (i == 0 || i == M) {
+            if (i == 0 || i == M || j == 0 || j == N) {
                 printf("#");
-            } else if (j == 0 || j == N) {
-                printf("#");
-            } else if (field[i][j] == 1) {
+            } else if ((field[i][j] >= tail) && (field[i][j] < head)) {
                 printf("o");
-            } else
+            } else if (field[i][j] == head)
+                printf("}");
+            else
                 printf(" ");
         }
         printf("\n");
@@ -61,92 +69,113 @@ void print() {
 
 
 void snake_init() {
-    field[1][1] = 1;
-}
-
-void up() {
-    for (int i = 0; i < M; ++i) {
-        for (int j = 0; j < N; ++j) {
-            if (field[i][j] == 1) {
-                field[i][j] = 0;
-                field[i-1][j] = 1;
-                return;
-            }
-        }
-    }
-}
-
-void down() {
-    for (int i = 0; i < M; ++i) {
-        for (int j = 0; j < N; ++j) {
-            if (field[i][j] == 1) {
-                field[i][j] = 0;
-                field[i+1][j] = 1;
-                return;
-            }
-        }
-    }
-}
-
-void left() {
-    for (int i = 0; i < M; ++i) {
-        for (int j = 0; j < N; ++j) {
-            if (field[i][j] == 1) {
-                field[i][j] = 0;
-                field[i][j-1] = 1;
-                return;
-            }
-        }
-    }
-}
-
-void right() {
-    for (int i = 0; i < M; ++i) {
-        for (int j = 0; j < N; ++j) {
-            if (field[i][j] == 1) {
-                field[i][j] = 0;
-                field[i][j+1] = 1;
-                return;
-            }
-        }
+    int j = x;
+    for (int i = 0; i < head; ++i) {
+        field[y][++j - head] = i + 1;
     }
 }
 
 
+void step(int change) {
+    switch (change) {
+        case 1:
+            if (direction == 3)
+                break;
+            direction = 1;
+            break;
+        case 2:
+            if (direction == 4)
+                break;
+            direction = 2;
+            break;
+        case 3:
+            if (direction == 1)
+                break;
+            direction = 3;
+            break;
+        case 4:
+            if (direction == 2)
+                break;
+            direction = 4;
+            break;
+        default:
+            break;
+    }
 
-void main() {
-    int c;
+    switch (direction) {
+        case 1:
+            if (y-- <= 1)
+                y = M - 1;
+            break;
+        case 2:
+            if (x++ >= N - 1)
+                x = 1;
+            break;
+        case 3:
+            if (y++ >= M - 1)
+                y = 1;
+            break;
+        case 4:
+            if (x-- <= 1)
+                x = N - 1;
+            break;
+        default:
+            break;
+    }
+
+    field[y][x] = ++head;
+
+    /// shift tail
+    for (int i = 0; i < M; ++i) {
+        for (int j = 0; j < N; ++j) {
+            if (field[i][j] == tail)
+                field[i][j] = 0;
+        }
+    }
+    tail++;
+}
+
+int main() {
+    int c = 0;
+    int direction_change = 2;
+    //TODO: 1. Init game menu
+    play = 1;
 
     snake_init();
 
-    while(1) {
-        set_mode(1);
-
+    while(play) {
+        /// Clear windows
         system("clear");
+
+        /// Print game
         print();
 
-        while (!(c = get_key())) usleep(10000);
+        /// Snake step
+        step(direction_change);
+
+        printf("Direction --> %d\n", direction);
+        printf("Head --> %d\n", head);
+        printf("Tail --> %d\n", tail);
+        printf("Body --> %d\n", head - tail);
+
+        /// Get input
+        set_mode(1);
+        c = get_key();
         if (c != 0) {
             if (c == 97)
-                left();
+                direction_change = 4;
             if (c == 100)
-                right();
+                direction_change = 2;
             if (c == 120)
-                break;
+                play = 0;
             if (c == 119)
-                up();
+                direction_change = 1;
             if (c == 115)
-                down();
+                direction_change = 3;
         }
 
-        //sleep(1);
+        usleep(300000);
     }
-    /*field[1][1] = 1;
-    for (int i = 0; i < 20; ++i) {
-        for (int j = 0; j < 50; ++j) {
-            printf("%d", field[i][j]);
-        }
-        printf("\n");
-    }*/
 
+    return 0;
 }
