@@ -18,7 +18,7 @@ int y = 1;
 int x = 6;
 int current_score = 0;
 
-int fruit_generated = 0;
+int fruit_generated = 0;  // ci je generovane ovocie (1 - ano, 0 - nie)
 int fruit_x = 10;
 int fruit_y = 7;
 int fruit_value = 0;
