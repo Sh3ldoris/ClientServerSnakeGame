@@ -4,13 +4,12 @@
 #include <time.h>
 #include <termios.h>
 
-//TODO: ked idem zhora zlava okolo ovocia tak ho zjem (??) a ked idem po x osi sprava tak ho zjem až keď som 1 pole za hlavou
 
 /// Rozmery plochy
-#define N 50
-#define M 15
+#define N  50
+#define M  15
 
-int field[15][50] = {0}; /// Pozicia pre hraca 1
+int field[M][N] = {0}; /// Pozicia pre hraca 1
 int direction = 2; /// Smer pohybu (1-4 clockwise)
 int head = 5;
 int tail = 1;
@@ -18,7 +17,7 @@ int y = 1;
 int x = 6;
 int current_score = 0;
 
-int fruit_generated = 0;  // ci je generovane ovocie (1 - ano, 0 - nie)
+int fruit_generated = 0;
 int fruit_x = 10;
 int fruit_y = 7;
 int fruit_value = 0;
@@ -64,15 +63,14 @@ void print() {
                 printf("#");
             } else if ((field[i][j] >= tail) && (field[i][j] < head)) {
                 printf("o");
-            } else if (field[i][j] == head)
+            } else if (field[i][j] == head) {
                 printf("x");
-            else
-                printf(" ");
-            if (fruit_generated == 1 && j == fruit_x && i == fruit_y) {             // ked ho zje tak sa to da na 0
+            } else if (fruit_generated == 1 && j == fruit_x && i == fruit_y) {
                 printf("%d",fruit_value);
-                j++;
+            } else {
+                printf(" ");
             }
-
+            /// !!! Bacha na ELSE vetvu !!!
         }
         printf("\n");
     }
@@ -83,6 +81,9 @@ void print() {
 }
 
 
+/**
+ * Initialization of snake
+ */
 void snake_init() {
     int j = x;
     for (int i = 0; i < head; ++i) {
@@ -90,16 +91,21 @@ void snake_init() {
     }
 }
 
-void generate_fruit() { // generator
-    fruit_x = (rand() % N - 1 ) + 1;
-    fruit_y = (rand() % M - 1 ) + 1;
+void generate_fruit() {
+    fruit_x = (rand() % (N - 2) ) + 1;
+    fruit_y = (rand() % (M - 2) ) + 1;
 
     fruit_value = (rand() % 3) + 1;
-    fruit_generated = 1;
+    /// Pokial sa vygeneruje napr v tele hada tak sa nezobrazi
+    if (field[fruit_y][fruit_x] == 0)
+        fruit_generated = 1;
 }
 
+/**
+ * Checks if snake is at fruit position
+ */
 void eat_fruit(){
-    if (fruit_x == x && fruit_y == y) {
+    if ((fruit_x) == x && fruit_y == y) {
         fruit_generated = 0;
         for (int i = 0; i < fruit_value; ++i) {
             tail--;
@@ -108,7 +114,18 @@ void eat_fruit(){
     }
 }
 
+/**
+ * Checks snake collision with itself
+ */
+void check_collision() {
+    if (field[y][x] != 0)
+        play = 0;
+}
 
+/**
+ * Change direction of movement
+ * @param change
+ */
 void step(int change) {
     switch (change) {
         case 1:
@@ -156,6 +173,9 @@ void step(int change) {
             break;
     }
 
+    eat_fruit();
+    check_collision();
+
     field[y][x] = ++head;
 
     /// shift tail
@@ -172,6 +192,7 @@ int main() {
     srand(time(NULL));
     int c = 0;
     int direction_change = 2;
+
     //TODO: 1. Init game menu
     play = 1;
     snake_init();
@@ -180,22 +201,17 @@ int main() {
         /// Clear windows
         system("clear");
 
-        /// Print game
-        print();
-
+        /// Generate fruit
         if (fruit_generated == 0) {
             generate_fruit();
         }
 
-
-
-        /// Snake step
-        step(direction_change);
-
-        eat_fruit();
+        /// Print game
+        print();
 
         printf("Direction --> %d\n", direction);
-        printf("Head --> %d\n", head);
+        printf("Head x,y--> [%d,%d]\n", x, y);
+        printf("Fruit x,y--> [%d,%d]\n", fruit_x, fruit_y);
         printf("Tail --> %d\n", tail);
         printf("Body --> %d\n", head - tail);
 
@@ -215,8 +231,13 @@ int main() {
                 direction_change = 3;
         }
 
+        /// Snake step
+        step(direction_change);
+
         usleep(300000);
     }
+
+    //TODO: End screen menu
 
     return 0;
 }
