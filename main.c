@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <time.h>
 #include <termios.h>
+
+//TODO: ked idem zhora zlava okolo ovocia tak ho zjem (??) a ked idem po x osi sprava tak ho zjem až keď som 1 pole za hlavou
 
 /// Rozmery plochy
 #define N 50
@@ -13,6 +16,12 @@ int head = 5;
 int tail = 1;
 int y = 1;
 int x = 6;
+int current_score = 0;
+
+int fruit_generated = 0;
+int fruit_x = 10;
+int fruit_y = 7;
+int fruit_value = 0;
 
 int play = 0;
 
@@ -56,14 +65,20 @@ void print() {
             } else if ((field[i][j] >= tail) && (field[i][j] < head)) {
                 printf("o");
             } else if (field[i][j] == head)
-                printf("}");
+                printf("x");
             else
                 printf(" ");
+            if (fruit_generated == 1 && j == fruit_x && i == fruit_y) {             // ked ho zje tak sa to da na 0
+                printf("%d",fruit_value);
+                j++;
+            }
+
         }
         printf("\n");
     }
 
-    printf("\n   Current Score: %d  HighScore: %d",12, 100);
+
+    printf("\n   Current Score: %d  HighScore: %d",current_score, 100);
     printf("\n");
 }
 
@@ -72,6 +87,24 @@ void snake_init() {
     int j = x;
     for (int i = 0; i < head; ++i) {
         field[y][++j - head] = i + 1;
+    }
+}
+
+void generate_fruit() { // generator
+    fruit_x = (rand() % N - 1 ) + 1;
+    fruit_y = (rand() % M - 1 ) + 1;
+
+    fruit_value = (rand() % 3) + 1;
+    fruit_generated = 1;
+}
+
+void eat_fruit(){
+    if (fruit_x == x && fruit_y == y) {
+        fruit_generated = 0;
+        for (int i = 0; i < fruit_value; ++i) {
+            tail--;
+            current_score++;
+        }
     }
 }
 
@@ -136,11 +169,11 @@ void step(int change) {
 }
 
 int main() {
+    srand(time(NULL));
     int c = 0;
     int direction_change = 2;
     //TODO: 1. Init game menu
     play = 1;
-
     snake_init();
 
     while(play) {
@@ -150,8 +183,16 @@ int main() {
         /// Print game
         print();
 
+        if (fruit_generated == 0) {
+            generate_fruit();
+        }
+
+
+
         /// Snake step
         step(direction_change);
+
+        eat_fruit();
 
         printf("Direction --> %d\n", direction);
         printf("Head --> %d\n", head);
