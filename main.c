@@ -188,13 +188,76 @@ void step(int change) {
     tail++;
 }
 
+void start_screen() {
+    system("clear");
+    printf("\n");
+    printf("    ________         ________ 			\n");
+    printf("   /        \\       /        \\ 			\n");
+    printf("  /  /----\\  \\     /  /----\\  \\ 			\n");
+    printf("  |  |    |  |     |  |    |  |       /	\n");
+    printf("  |  |    |  |     |  |    |  |      /|	\n");
+    printf(" (o  o)    \\  \\____/  /    \\  \\_____/ | 	\n");
+    printf("  \\__/      \\        /      \\        / 	\n");
+    printf("             --------        -------- 		\n");
+    printf("    											\n");
+    printf("	    Start when you're ready!\n");
+    printf("	    Press ENTER to START.	\n");
+
+    printf("\n");
+
+    int c = fgetc(stdin);
+        if (c == 10)
+            play = 1;
+}
+
+void loser_screen() {
+    system("clear");
+    printf("\n");
+    printf("         ________    		\n");
+    printf("        /        \\     		\n");
+    printf("       /  /----\\  \\   		\n");
+    printf("       |  |    |  |    	\n");
+    printf("       |  |    |  |   	\n");
+    printf("      (o  o)   |  | 	\n");
+    printf("  |\\   \\__/    |  | 	\n");
+    printf("  | \\__________/  /    	\n");
+    printf("  \\              /    	\n");
+    printf("   -------------  		\n");
+    printf("	    Game OVER!\n");
+    printf("	    Your SCORE: %d !\n", current_score);
+    printf("\n");
+
+}
+
+void winner_screen() {
+    system("clear");
+    printf("\n");
+    printf("         _________________________________    		\n");
+    printf("        /                                 \\     		\n");
+    printf("       /  /-----------------------------\\  \\   		\n");
+    printf("       |  |          . . . . . . .      |  |    	\n");
+    printf("       |  |          |\\/\\/\\/\\/\\/\\|      |  |   	\n");
+    printf("      (o  o)         | o o o o o |      |  | 	\n");
+    printf("       \\__/    |\\    |___________|      |  | 	\n");
+    printf("               | \\______________________/  /    	\n");
+    printf("               \\                          /    	\n");
+    printf("                --------------------------  		\n");
+    printf("	    You WON!\n");
+    printf("	    Your SCORE: %d !\n", current_score);
+
+    printf("\n");
+
+}
+
+
 int main() {
     srand(time(NULL));
     int c = 0;
     int direction_change = 2;
 
-    //TODO: 1. Init game menu
-    play = 1;
+
+    start_screen();
+
     snake_init();
 
     while(play) {
@@ -237,7 +300,11 @@ int main() {
         usleep(300000);
     }
 
-    //TODO: End screen menu
+    if (current_score == 0)
+        loser_screen();
+    if (current_score > 0)
+        winner_screen();
+
 
     return 0;
 }
