@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
@@ -12,8 +11,8 @@ int field[M][N] = {0}; /// Pozicia pre hraca 1
 int direction = 2; /// Smer pohybu (1-4 clockwise)
 int head = 5;
 int tail = 1;
-int y = 1;
-int x = 6;
+int y = M / 4;
+int x = 10;
 int current_score = 0;
 
 int fruit_generated = 0;
@@ -23,12 +22,13 @@ int fruit_value = 0;
 
 int play = 0;
 
-void draw_area();
+void draw_arena();
 int key_hit();
 void draw_game();
 void snake_init();
-void draw_area();
+void draw_arena();
 void draw_game_over();
+void countdown();
 void generate_fruit();
 void eat_fruit();
 void check_collision();
@@ -59,7 +59,10 @@ int main() {
     start_screen();
 
     snake_init();
-    draw_area();
+    draw_arena();
+
+    /// Countdown from 3
+    countdown();
 
     while(play) {
         /// Generate fruit
@@ -96,7 +99,6 @@ int main() {
     draw_game_over();
 
     sleep(2);
-    //system("clear");
 
     if (current_score == 0)
         loser_screen();
@@ -151,7 +153,7 @@ void snake_init() {
     }
 }
 
-void draw_area() {
+void draw_arena() {
     move(0,0);
     attr_on(COLOR_PAIR(2),0);
     for(int i=0;i<=M;i++){
@@ -176,7 +178,20 @@ void draw_game_over() {
     mvprintw((M / 2) + 1, (N/2) - 6, "           ");
     move(0,0);
     attr_off(COLOR_PAIR(3),0);
+    move(M + 1, 0);
     refresh();
+}
+
+void countdown() {
+    draw_game();
+    for (int i = 3; i > 0; --i) {
+        attr_on(COLOR_PAIR(3),0);
+        mvprintw(M / 2, (N/2), "%d", i);
+        move(M + 1,0);
+        attr_off(COLOR_PAIR(3),0);
+        refresh();
+        sleep(1);
+    }
 }
 
 void generate_fruit() {
@@ -278,7 +293,7 @@ void step(int change) {
 
 void start_screen() {
     system("clear");
-    draw_area();
+    draw_arena();
     attr_on(COLOR_PAIR(1),0);
     mvprintw(M/2 - 4, N/2 - 20, "    ________         ________  ");
     mvprintw(M/2 - 3,  N/2 - 20, "   /        \\       /        \\        0 ");
@@ -291,29 +306,29 @@ void start_screen() {
     attr_off(COLOR_PAIR(1),0);
 
     mvprintw(M/2 + 5,  N/2 - 12 ,"Start when you are ready!");
-
     refresh();
 
     attr_on(COLOR_PAIR(4),0);
     while (getch() != '\n')  /// caka na enter
     {
         mvprintw(M/2 + 6,  N/2 - 10 , "Press ENTER to START.");
+        move(M + 1, 0);
         refresh();
         sleep(1);
         mvprintw(M/2 + 6,  N/2 - 10 ,"                     ");
+        move(M + 1, 0);
         refresh();
         sleep(1);
 
     }
     attr_off(COLOR_PAIR(4),0);
     play = 1;
-    ///system("clear");
 
 }
 
 void loser_screen() {
     //system("clear");
-    draw_area();
+    draw_arena();
     attr_on(COLOR_PAIR(3),0);
     mvprintw(M/2 - 7, N/2 - 11,"         ________   ");
     mvprintw(M/2 - 6,  N/2 - 11,"        /        \\  ");
@@ -331,19 +346,18 @@ void loser_screen() {
     mvprintw(M/2 + 5,  N/2 - 11,"	 Your SCORE: %d !", current_score);
 
     mvprintw(M + 2, (N/2) - 16, "                                    ");
-
     refresh();
 
     attr_on(COLOR_PAIR(1),0);
     while (getch() != '\n'){
         mvprintw(M/2 + 6, N/2 - 13,"  Press ENTER to FINISH !");
+        move(M + 1, 0);
     }
     attr_off(COLOR_PAIR(1),0);
 }
 
 void winner_screen() {
-    //system("clear");
-    draw_area();
+    draw_arena();
     attr_on(COLOR_PAIR(4),0);
     mvprintw(M/2 - 7, N/2 - 22,"      _________________________________  ");
     mvprintw(M/2 - 6, N/2 - 22,"     /                                 \\ ");
@@ -366,6 +380,7 @@ void winner_screen() {
     attr_on(COLOR_PAIR(1),0);
     while (getch() != '\n') {
         mvprintw(M/2 + 6, N/2 - 13,"  Press ENTER to FINISH !");
+        move(M + 1, 0);
     }
     attr_off(COLOR_PAIR(1),0);
 
