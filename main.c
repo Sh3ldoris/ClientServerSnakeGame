@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
@@ -12,8 +11,8 @@ int field[M][N] = {0}; /// Pozicia pre hraca 1
 int direction = 2; /// Smer pohybu (1-4 clockwise)
 int head = 5;
 int tail = 1;
-int y = 1;
-int x = 6;
+int y = M / 4;
+int x = 10;
 int current_score = 0;
 
 int fruit_generated = 0;
@@ -23,12 +22,13 @@ int fruit_value = 0;
 
 int play = 0;
 
-void draw_area();
+void draw_arena();
 int key_hit();
 void draw_game();
 void snake_init();
-void draw_area();
+void draw_arena();
 void draw_game_over();
+void countdown();
 void generate_fruit();
 void eat_fruit();
 void check_collision();
@@ -45,6 +45,13 @@ int main() {
     nodelay(stdscr, TRUE);
     scrollok(stdscr, TRUE);
 
+    /// color pairs used for color graphics
+    start_color();
+    init_pair(1, COLOR_GREEN, COLOR_BLACK);
+    init_pair(2, COLOR_CYAN, COLOR_BLACK);
+    init_pair(3, COLOR_RED, COLOR_BLACK);
+    init_pair(4, COLOR_YELLOW, COLOR_BLACK);
+
     srand(time(NULL));
     int c = 0;
     int direction_change = 2;
@@ -52,7 +59,10 @@ int main() {
     start_screen();
 
     snake_init();
-    draw_area();
+    draw_arena();
+
+    /// Countdown from 3
+    countdown();
 
     while(play) {
         /// Generate fruit
@@ -89,7 +99,6 @@ int main() {
     draw_game_over();
 
     sleep(2);
-    system("clear");
 
     if (current_score == 0)
         loser_screen();
@@ -144,8 +153,9 @@ void snake_init() {
     }
 }
 
-void draw_area() {
+void draw_arena() {
     move(0,0);
+    attr_on(COLOR_PAIR(2),0);
     for(int i=0;i<=M;i++){
         for (int j = 0; j <= N; ++j) {
             if (i == 0 || i == M || j == 0 || j == N) {
@@ -157,15 +167,31 @@ void draw_area() {
         }
         printw("\n");
     }
+    attr_off(COLOR_PAIR(2),0);
     refresh();
 }
 
 void draw_game_over() {
+    attr_on(COLOR_PAIR(3),0);
     mvprintw((M / 2) - 1, (N/2) - 6, "           ");
     mvprintw(M / 2, (N/2) - 6, " Game OVER ");
     mvprintw((M / 2) + 1, (N/2) - 6, "           ");
     move(0,0);
+    attr_off(COLOR_PAIR(3),0);
+    move(M + 1, 0);
     refresh();
+}
+
+void countdown() {
+    draw_game();
+    for (int i = 3; i > 0; --i) {
+        attr_on(COLOR_PAIR(3),0);
+        mvprintw(M / 2, (N/2), "%d", i);
+        move(M + 1,0);
+        attr_off(COLOR_PAIR(3),0);
+        refresh();
+        sleep(1);
+    }
 }
 
 void generate_fruit() {
@@ -267,68 +293,95 @@ void step(int change) {
 
 void start_screen() {
     system("clear");
-    move(0,0);
-    printw("\n");
-    printw("    ________         ________ 			  \n");
-    printw("   /        \\       /        \\        0  \n");
-    printw("  /  /----\\  \\     /  /----\\  \\       0  \n");
-    printw("  |  |    |  |     |  |    |  |      / \\ \n");
-    printw("  |  |    |  |     |  |    |  |     /  |  \n");
-    printw(" (o  o)   \\   \\___/   /    \\   \\___/   / \n");
-    printw("  \\__/     \\         /      \\         /  \n");
-    printw("            --------         -------- 	   \n");
-    printw("\n");
-    printw("	Start when you are ready!\n");
-    printw("	  Press ENTER to START.	\n");
+    draw_arena();
+    attr_on(COLOR_PAIR(1),0);
+    mvprintw(M/2 - 4, N/2 - 20, "    ________         ________  ");
+    mvprintw(M/2 - 3,  N/2 - 20, "   /        \\       /        \\        0 ");
+    mvprintw(M/2 - 2,  N/2 - 20 , "  /  /----\\  \\     /  /----\\  \\       0  ");
+    mvprintw(M/2 - 1,  N/2 - 20 , "  |  |    |  |     |  |    |  |      / \\ ");
+    mvprintw(M/2 ,  N/2 - 20, "  |  |    |  |     |  |    |  |     /  |  ");
+    mvprintw(M/2 + 1,  N/2 - 20," (o  o)   \\   \\___/   /    \\   \\___/   / ");
+    mvprintw(M/2 + 2,  N/2 - 20 , "  \\__/     \\         /      \\         /  ");
+    mvprintw(M/2 + 3,  N/2 - 20 , "            --------         -------- 	");
+    attr_off(COLOR_PAIR(1),0);
 
+    mvprintw(M/2 + 5,  N/2 - 12 ,"Start when you are ready!");
     refresh();
 
+    attr_on(COLOR_PAIR(4),0);
     while (getch() != '\n')  /// caka na enter
+    {
+        mvprintw(M/2 + 6,  N/2 - 10 , "Press ENTER to START.");
+        move(M + 1, 0);
+        refresh();
+        sleep(1);
+        mvprintw(M/2 + 6,  N/2 - 10 ,"                     ");
+        move(M + 1, 0);
+        refresh();
+        sleep(1);
+
+    }
+    attr_off(COLOR_PAIR(4),0);
     play = 1;
-    system("clear");
+
 }
 
 void loser_screen() {
-    system("clear");
-    move(0,0);
-    printw("\n");
-    printw("         ________    		\n");
-    printw("        /        \\     		\n");
-    printw("       /  /----\\  \\   		\n");
-    printw("       |  |    |  |    	\n");
-    printw("       |  |    |  |   	\n");
-    printw("      (o  o)   |  | 	\n");
-    printw("  |\\   \\__/    |  | 	\n");
-    printw("  | \\__________/  /    	\n");
-    printw("  \\              /    	\n");
-    printw("   -------------  		\n");
-    printw("	      Game OVER!\n");
-    printw("	    Your SCORE: %d !\n", current_score);
-    printw("\n");
+    //system("clear");
+    draw_arena();
+    attr_on(COLOR_PAIR(3),0);
+    mvprintw(M/2 - 7, N/2 - 11,"         ________   ");
+    mvprintw(M/2 - 6,  N/2 - 11,"        /        \\  ");
+    mvprintw(M/2 - 5,  N/2 - 11,"       /  /----\\  \\  ");
+    mvprintw(M/2 - 4,  N/2 - 11,"       |  |    |  |  ");
+    mvprintw(M/2 - 3,  N/2 - 11,"       |  |    |  | ");
+    mvprintw(M/2 - 2,  N/2 - 11,"      (o  o)   |  | ");
+    mvprintw(M/2 - 1,  N/2 - 11,"  |\\   \\__/    |  | ");
+    mvprintw(M/2 ,  N/2 - 11,"  | \\__________/  / ");
+    mvprintw(M/2 + 1,  N/2 - 11,"  \\              / ");
+    mvprintw(M/2 + 2,  N/2 - 11,"   -------------  	");
+    attr_off(COLOR_PAIR(3),0);
+
+    mvprintw(M/2 + 4,  N/2 - 11,"	   Game OVER!");
+    mvprintw(M/2 + 5,  N/2 - 11,"	 Your SCORE: %d !", current_score);
+
+    mvprintw(M + 2, (N/2) - 16, "                                    ");
     refresh();
 
-    while (getch() != '\n');
+    attr_on(COLOR_PAIR(1),0);
+    while (getch() != '\n'){
+        mvprintw(M/2 + 6, N/2 - 13,"  Press ENTER to FINISH !");
+        move(M + 1, 0);
+    }
+    attr_off(COLOR_PAIR(1),0);
 }
 
 void winner_screen() {
-    system("clear");
-    move(0,0);
-    printw("\n");
-    printw("         _________________________________    		\n");
-    printw("        /                                 \\     		\n");
-    printw("       /  /-----------------------------\\  \\   		\n");
-    printw("       |  |          . . . . . . .      |  |    	\n");
-    printw("       |  |          |\\/\\/\\/\\/\\/\\|      |  |   	\n");
-    printw("      (o  o)         | o o o o o |      |  | 	\n");
-    printw("       \\__/    |\\    |___________|      |  | 	\n");
-    printw("               | \\______________________/  /    	\n");
-    printw("               \\                          /    	\n");
-    printw("                --------------------------  		\n");
-    printw("	       You WON!\n");
-    printw("	    Your SCORE: %d !\n", current_score);
+    draw_arena();
+    attr_on(COLOR_PAIR(4),0);
+    mvprintw(M/2 - 7, N/2 - 22,"      _________________________________  ");
+    mvprintw(M/2 - 6, N/2 - 22,"     /                                 \\ ");
+    mvprintw(M/2 - 5, N/2 - 22,"    /  /-----------------------------\\  \\ ");
+    mvprintw(M/2 - 4, N/2 - 22,"    |  |          . . . . . . .      |  | ");
+    mvprintw(M/2 - 3, N/2 - 22,"    |  |          |\\/\\/\\/\\/\\/\\|      |  | ");
+    mvprintw(M/2 - 2, N/2 - 22,"   (o  o)         | o o o o o |      |  | ");
+    mvprintw(M/2 - 1, N/2 - 22,"    \\__/    |\\    |___________|      |  | 	");
+    mvprintw(M/2 , N/2 - 22,"            | \\______________________/  /  ");
+    mvprintw(M/2 + 1, N/2 - 22,"            \\                          /  ");
+    mvprintw(M/2 + 2, N/2 - 22,"             --------------------------  ");
+    attr_off(COLOR_PAIR(4),0);
 
-    printw("\n");
+    mvprintw(M/2 + 4, N/2 - 10,"     You WON!");
+    mvprintw(M/2 + 5, N/2 - 10,"  Your SCORE: %d !", current_score);
+
+    mvprintw(M + 2, (N/2) - 16, "                                    ");
     refresh();
-    while (getch() != '\n');
+
+    attr_on(COLOR_PAIR(1),0);
+    while (getch() != '\n') {
+        mvprintw(M/2 + 6, N/2 - 13,"  Press ENTER to FINISH !");
+        move(M + 1, 0);
+    }
+    attr_off(COLOR_PAIR(1),0);
 
 }
