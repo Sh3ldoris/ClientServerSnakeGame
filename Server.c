@@ -4,7 +4,6 @@
 #include <curses.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <netdb.h>
 #include <string.h>
 #include <pthread.h>
 
@@ -42,7 +41,6 @@ char buffer[256];
 
 pthread_mutex_t mut;
 pthread_cond_t cond1;
-pthread_cond_t cond2;
 
 pthread_t server_player;
 pthread_t client;
@@ -98,7 +96,6 @@ int main(int argc, char *argv[]) {
     /// Create threads
     DATA data = {newsockt, 1, &mut, &cond1};
 
-    printf("Protivnik sa pripojil!\n");
     pthread_create(&server_player, NULL, &play_game, &data);
     pthread_create(&client, NULL, &listen_client, &data);
 
@@ -111,7 +108,6 @@ int main(int argc, char *argv[]) {
 
     close(newsockt);
     close(sockt);
-    
     endwin();
     return 0;
 }
@@ -150,7 +146,6 @@ void connect_client(char *argv[]) {
     listen(sockt, 1);
     cli_len = sizeof(cli_addr);
 
-    printf("Cakam na pripojenie protivnika...\n");
     wait_opponent_join_screen();
     newsockt = accept(sockt, (struct sockaddr*)&cli_addr, &cli_len);
     if (newsockt < 0) {
@@ -186,6 +181,9 @@ void* play_game(void* arg) {
     pthread_mutex_unlock(data->mut);
 
     while(play) {
+        pthread_mutex_lock(data->mut);
+        play = data->play;
+        pthread_mutex_unlock(data->mut);
 
         /// Generate fruit
         if (fruit_generated == 0) {
@@ -211,10 +209,7 @@ void* play_game(void* arg) {
                 direction_change = 3;
         }
 
-        pthread_mutex_lock(data->mut);
         step(direction_change);
-        data->play = play;
-        pthread_mutex_unlock(data->mut);
 
         usleep(300000);
     }
@@ -238,12 +233,16 @@ void * listen_client(void* arg) {
     bzero(buffer,201);
     while (data->play && (len = read(data->socket_descriptor, buffer, 200))) {
         if (strcmp(buffer, "play") == 0) {
+            bzero(buffer, 201);
+            strcpy(buffer, "ok");
+            write(data->socket_descriptor, buffer, strlen(buffer));
             pthread_cond_signal(data->is_game_on);
         }
-        bzero(buffer, 201);
-        strcpy(buffer, "ok");
-        write(data->socket_descriptor, buffer, strlen(buffer));
     }
+    mvprintw(M + 3, 0, "Uz som skoncil!");
+    pthread_mutex_lock(data->mut);
+    data->play = 0;
+    pthread_mutex_unlock(data->mut);
 }
 
 /**

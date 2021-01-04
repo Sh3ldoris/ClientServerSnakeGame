@@ -6,11 +6,19 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <string.h>
+#include <pthread.h>
 
 
 /// Rozmery plochy
 #define N  50
 #define M  18
+
+typedef struct game_data {
+    int socket_descriptor;
+    int play;
+    pthread_mutex_t* mut;
+    pthread_cond_t* is_game_on;
+} DATA;
 
 int field[M][N] = {0}; /// Pozicia pre hraca 1
 int direction = 2; /// Smer pohybu (1-4 clockwise)
@@ -33,9 +41,17 @@ struct hostent* server;
 
 char buffer[256];
 
+pthread_mutex_t mut;
+pthread_cond_t cond1;
+
+pthread_t server_player;
+pthread_t client;
+
 void draw_arena();
 int key_hit();
 void connect_to_server(char *argv[]);
+void* play_game(void* arg);
+void * listen_server(void* arg);
 void draw_game();
 void snake_init();
 void draw_arena();
@@ -48,8 +64,12 @@ void step(int change);
 void start_screen();
 void loser_screen();
 void winner_screen();
+int send_message(char *message);
 
 int main(int argc, char *argv[]) {
+    pthread_mutex_init(&mut, NULL);
+    pthread_cond_init(&cond1, NULL);
+
     if (argc < 2) {
         fprintf(stderr,"usage %s port\n", argv[0]);
         return 1;
@@ -71,59 +91,22 @@ int main(int argc, char *argv[]) {
     init_pair(4, COLOR_YELLOW, COLOR_BLACK);
 
     srand(time(NULL));
-    int c = 0;
-    int direction_change = 2;
 
     start_screen();
 
-    snake_init();
-    draw_arena();
+    /// Create threads
+    DATA data = {sockt, 1, &mut, &cond1};
 
-    /// Countdown from 3
-    countdown();
+    pthread_create(&client, NULL, &play_game, &data);
+    pthread_create(&server_player, NULL, &listen_server, &data);
 
-    while(play) {
-        /// Generate fruit
-        if (fruit_generated == 0) {
-            generate_fruit();
-        }
+    pthread_join(server_player, NULL);
+    pthread_join(client, NULL);
 
-        /// Print play_game area
-        draw_game();
+    pthread_cond_destroy(&cond1);
+    pthread_mutex_destroy(&mut);
 
-
-        /// Get input
-        if (key_hit()) {
-            c = getch();
-            if (c == 97)
-                direction_change = 4;
-            if (c == 100)
-                direction_change = 2;
-            if (c == 120)
-                play = 0;
-            if (c == 119)
-                direction_change = 1;
-            if (c == 115)
-                direction_change = 3;
-        }
-
-        /// Snake step
-        step(direction_change);
-
-        usleep(300000);
-    }
-    refresh();
-
-    draw_game_over();
-
-    sleep(2);
-
-    if (current_score == 0)
-        loser_screen();
-    if (current_score > 0)
-        winner_screen();
-
-
+    close(sockt);
     endwin();
     return 0;
 }
@@ -169,6 +152,68 @@ void connect_to_server(char *argv[]) {
     }
 
     usleep(10000);
+}
+
+void* play_game(void* arg) {
+    DATA* data = (DATA*) arg;
+
+    int c = 0;
+    int direction_change = 2;
+
+    snake_init();
+    draw_arena();
+
+    /// Countdown from 3
+    countdown();
+
+    while(play) {
+        /// Generate fruit
+        if (fruit_generated == 0) {
+            generate_fruit();
+        }
+
+        /// Print play_game area
+        draw_game();
+
+
+        /// Get input
+        if (key_hit()) {
+            c = getch();
+            if (c == 97)
+                direction_change = 4;
+            if (c == 100)
+                direction_change = 2;
+            if (c == 120)
+                play = 0;
+            if (c == 119)
+                direction_change = 1;
+            if (c == 115)
+                direction_change = 3;
+        }
+
+        pthread_mutex_lock(data->mut);
+        step(direction_change);
+        data->play = play;
+        pthread_mutex_unlock(data->mut);
+
+        usleep(300000);
+    }
+    refresh();
+
+    draw_game_over();
+
+    sleep(2);
+
+    if (current_score == 0)
+        loser_screen();
+    if (current_score > 0)
+        winner_screen();
+
+}
+
+void * listen_server(void* arg) {
+    //TODO: Implement client disconnection
+    //TODO: Create message transfer
 }
 
 /**
@@ -376,12 +421,8 @@ void start_screen() {
 
     }
 
-    bzero(buffer,256);
-    strcpy(buffer, "play");
-    n = write(sockt, buffer, strlen(buffer));
-    if (n < 0)
-    {
-        perror("Error writing to socket");
+    if (send_message("play") < 0) {
+        endwin();
         exit(5);
     }
 
@@ -448,4 +489,13 @@ void winner_screen() {
     }
     attr_off(COLOR_PAIR(1),0);
 
+}
+
+int send_message(char *message) {
+    bzero(buffer,256);
+    strcpy(buffer, message);
+    n = write(sockt, buffer, strlen(buffer));
+    if (n < 0)
+        return -1;
+    return 0;
 }
