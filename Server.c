@@ -122,6 +122,16 @@ int key_hit() {
     }
 }
 
+/**
+ * Initialization of snake
+ */
+void snake_init() {
+    int j = x;
+    for (int i = 0; i < head; ++i) {
+        field[y][++j - head] = i + 1;
+    }
+}
+
 void draw_game() {
     for(int i = 1; i <= M - 1; i++){
         for (int j = 1; j <= N - 1; j++) {
@@ -142,28 +152,23 @@ void draw_game() {
     refresh();
 }
 
-
-/**
- * Initialization of snake
- */
-void snake_init() {
-    int j = x;
-    for (int i = 0; i < head; ++i) {
-        field[y][++j - head] = i + 1;
-    }
-}
-
 void draw_arena() {
     move(0,0);
     attr_on(COLOR_PAIR(2),0);
     for(int i=0;i<=M;i++){
         for (int j = 0; j <= N; ++j) {
-            if (i == 0 || i == M || j == 0 || j == N) {
-                printw("#");
-            } else {
+            if ((i == 0 && j == 0) || (i == 0 && j == N) || (i == M && j == 0) || (i == M && j == N)) {
+                printw("+");
+            }
+            if ((i == 0 && j > 0 && j < N) || (i == M && j > 0 && j < N)) {
+                printw("-");
+            }
+            if ((i > 0 && i < M && j == 0) || (i > 0 && i < M && j == N)) {
+                printw("|");
+            }
+            if (i > 0 && i < M && j > 0 && j < N) {
                 printw(" ");
             }
-            /// !!! Bacha na ELSE vetvu !!!
         }
         printw("\n");
     }
