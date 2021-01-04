@@ -36,6 +36,8 @@ void step(int change);
 void start_screen();
 void loser_screen();
 void winner_screen();
+void wait_opponent_join_screen();
+void wait_opponent_to_start_game_screen();
 
 int main() {
 
@@ -327,9 +329,90 @@ void start_screen() {
 
     }
     attr_off(COLOR_PAIR(4),0);
-    play = 1;
 
+    wait_opponent_join_screen();
 }
+
+void wait_opponent_join_screen() {
+    //system("clear");
+    draw_arena();
+
+    attr_on(COLOR_PAIR(1),0);
+    mvprintw(M/2 - 4, N/2 - 10, "     /");
+    mvprintw(M/2 - 3,  N/2 - 10, "   \\/ ");
+    mvprintw(M/2 - 2,  N/2 - 18 , "  .... ->->->->->");
+    mvprintw(M/2 - 1,  N/2 - 18 , "  |  |            ");
+    mvprintw(M/2 ,  N/2 - 18, "  |  |                ");
+    mvprintw(M/2 + 1,  N/2 - 18," (o  o)             ");
+    mvprintw(M/2 + 2,  N/2 - 18 , "  \\__/           ");
+    mvprintw(M/2 + 3,  N/2 - 18 , "      	");
+    attr_off(COLOR_PAIR(1),0);
+    attr_on(COLOR_PAIR(3),0);
+    mvprintw(M/2 - 4, N/2 + 5, " \\/");
+    mvprintw(M/2 - 3,  N/2 + 5, " /\\ ");
+    mvprintw(M/2 - 2,  N/2 + 2 , "<-<-<-<-<- .... ");
+    mvprintw(M/2 - 1,  N/2 + 2 , "           |  |");
+    mvprintw(M/2 ,  N/2 + 2, "           |  |   ");
+    mvprintw(M/2 + 1,  N/2 + 2,"          (o  o)   ");
+    mvprintw(M/2 + 2,  N/2 + 2 , "           \\__/   ");
+    mvprintw(M/2 + 3,  N/2 + 2, "      	");
+    attr_off(COLOR_PAIR(3),0);
+
+    attr_on(COLOR_PAIR(4),0);
+    while (getch() != '\n')  /// treba doplnit logiku ze ked dostane od supera "play" zacne
+    {
+        mvprintw(M/2 + 6,  N/2 - 15 , "Waiting for OPPONENT to join.  ");
+        move(M + 1, 0);
+        refresh();
+        usleep(100000);
+        mvprintw(M/2 + 6,  N/2 - 15 , "Waiting for OPPONENT to join.. ");
+        move(M + 1, 0);
+        refresh();
+        usleep(100000);
+        mvprintw(M/2 + 6,  N/2 - 15 , "Waiting for OPPONENT to join...");
+        move(M + 1, 0);
+        refresh();
+        usleep(100000);
+
+    }
+    attr_off(COLOR_PAIR(4),0);
+    wait_opponent_to_start_game_screen();
+}
+
+void wait_opponent_to_start_game_screen() {
+    draw_arena();
+    attr_on(COLOR_PAIR(1),0);
+    mvprintw(M/2 - 4, N/2 - 10, "     /            /");
+    mvprintw(M/2 - 3,  N/2 - 10, "   \\/          \\/ ");
+    mvprintw(M/2 - 2,  N/2 - 18 , "  .... ----------------------- .... ");
+    mvprintw(M/2 - 1,  N/2 - 18 , "  |  |                         |  |");
+    mvprintw(M/2 ,  N/2 - 18, "  |  |                         |  |   ");
+    mvprintw(M/2 + 1,  N/2 - 18," (o  o)                       (o  o)   ");
+    mvprintw(M/2 + 2,  N/2 - 18 , "  \\__/                         \\__/   ");
+    attr_off(COLOR_PAIR(1),0);
+    mvprintw(M/2 + 4,  N/2 - 15, " Opponent JOINED SUCCESSFULLY.");
+
+    attr_on(COLOR_PAIR(4),0);
+    while (getch() != '\n')  /// treba doplnit logiku ze ked dostane od supera "play" zacne
+    {
+        mvprintw(M/2 + 6,  N/2 - 18 , "Waiting for OPPONENT to START GAME.  ");
+        move(M + 1, 0);
+        refresh();
+        usleep(100000);
+        mvprintw(M/2 + 6,  N/2 - 18 , "Waiting for OPPONENT to START GAME.. ");
+        move(M + 1, 0);
+        refresh();
+        usleep(100000);
+        mvprintw(M/2 + 6,  N/2 - 18 , "Waiting for OPPONENT to START GAME...");
+        move(M + 1, 0);
+        refresh();
+        usleep(100000);
+
+
+    }
+    attr_off(COLOR_PAIR(4),0);
+    play = 1;
+};
 
 void loser_screen() {
     //system("clear");
