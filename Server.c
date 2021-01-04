@@ -2,10 +2,22 @@
 #include <unistd.h>
 #include <time.h>
 #include <curses.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <string.h>
+#include <pthread.h>
 
 /// Rozmery plochy
 #define N  50
 #define M  18
+
+typedef struct game_data {
+    int socket_descriptor;
+    int play;
+    pthread_mutex_t* mut;
+    pthread_cond_t* is_game_on;
+} DATA;
 
 int field[M][N] = {0}; /// Pozicia pre hraca 1
 int direction = 2; /// Smer pohybu (1-4 clockwise)
@@ -22,10 +34,27 @@ int fruit_value = 0;
 
 int play = 0;
 
+int sockt, newsockt;
+socklen_t cli_len;
+struct sockaddr_in serv_addr, cli_addr;
+int n;
+char buffer[256];
+
+pthread_mutex_t mut;
+pthread_cond_t cond1;
+pthread_cond_t cond2;
+
+pthread_t server_player;
+pthread_t client;
+
+
 void draw_arena();
 int key_hit();
+void connect_client(char *argv[]);
 void draw_game();
 void snake_init();
+void* play_game(void* arg);
+void * listen_client(void* arg);
 void draw_arena();
 void draw_game_over();
 void countdown();
@@ -39,7 +68,9 @@ void winner_screen();
 void wait_opponent_join_screen();
 void wait_opponent_to_start_game_screen();
 
-int main() {
+int main(int argc, char *argv[]) {
+    pthread_mutex_init(&mut, NULL);
+    pthread_cond_init(&cond1, NULL);
 
     initscr();
     cbreak();
@@ -55,10 +86,94 @@ int main() {
     init_pair(4, COLOR_YELLOW, COLOR_BLACK);
 
     srand(time(NULL));
+
+    if (argc < 2) {
+        fprintf(stderr,"usage %s port\n", argv[0]);
+        return 1;
+    } else {
+        start_screen();
+        connect_client(argv);
+    }
+
+    /// Create threads
+    DATA data = {newsockt, 1, &mut, &cond1};
+
+    printf("Protivnik sa pripojil!\n");
+    pthread_create(&server_player, NULL, &play_game, &data);
+    pthread_create(&client, NULL, &listen_client, &data);
+
+    pthread_join(server_player, NULL);
+    pthread_join(client, NULL);
+
+
+    pthread_cond_destroy(&cond1);
+    pthread_mutex_destroy(&mut);
+
+    close(newsockt);
+    close(sockt);
+    
+    endwin();
+    return 0;
+}
+
+
+int key_hit() {
+    int ch = getch();
+
+    if (ch != ERR) {
+        ungetch(ch);
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+void connect_client(char *argv[]) {
+    bzero((char*)&serv_addr, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(atoi(argv[1]));
+
+    sockt = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockt < 0) {
+        perror("Error creating socket");
+        endwin();
+        exit(1);
+    }
+
+    if (bind(sockt, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
+        perror("Error binding socket address");
+        endwin();
+        exit(2);
+    }
+
+    listen(sockt, 1);
+    cli_len = sizeof(cli_addr);
+
+    printf("Cakam na pripojenie protivnika...\n");
+    wait_opponent_join_screen();
+    newsockt = accept(sockt, (struct sockaddr*)&cli_addr, &cli_len);
+    if (newsockt < 0) {
+        perror("Protivnikovi sa nepodarilo pripojit!");
+        endwin();
+        exit(3);
+    }
+    wait_opponent_to_start_game_screen();
+}
+
+void* play_game(void* arg) {
+    DATA* data = (DATA*) arg;
+
+    pthread_mutex_lock(data->mut);
+
+    if (data->play == 1) {
+        pthread_cond_wait(data->is_game_on, data->mut);
+    }
+
+    pthread_mutex_unlock(data->mut);
+
     int c = 0;
     int direction_change = 2;
-
-    start_screen();
 
     snake_init();
     draw_arena();
@@ -66,13 +181,18 @@ int main() {
     /// Countdown from 3
     countdown();
 
+    pthread_mutex_lock(data->mut);
+    play = data->play;
+    pthread_mutex_unlock(data->mut);
+
     while(play) {
+
         /// Generate fruit
         if (fruit_generated == 0) {
             generate_fruit();
         }
 
-        /// Print game area
+        /// Print play_game area
         draw_game();
 
 
@@ -91,8 +211,10 @@ int main() {
                 direction_change = 3;
         }
 
-        /// Snake step
+        pthread_mutex_lock(data->mut);
         step(direction_change);
+        data->play = play;
+        pthread_mutex_unlock(data->mut);
 
         usleep(300000);
     }
@@ -107,20 +229,20 @@ int main() {
     if (current_score > 0)
         winner_screen();
 
-
-    endwin();
-    return 0;
 }
 
-
-int key_hit() {
-    int ch = getch();
-
-    if (ch != ERR) {
-        ungetch(ch);
-        return 1;
-    } else {
-        return 0;
+void * listen_client(void* arg) {
+    int len;
+    DATA* data = (DATA*) arg;
+    char buffer[201];
+    bzero(buffer,201);
+    while (data->play && (len = read(data->socket_descriptor, buffer, 200))) {
+        if (strcmp(buffer, "play") == 0) {
+            pthread_cond_signal(data->is_game_on);
+        }
+        bzero(buffer, 201);
+        strcpy(buffer, "ok");
+        write(data->socket_descriptor, buffer, strlen(buffer));
     }
 }
 
@@ -128,7 +250,7 @@ int key_hit() {
  * Initialization of snake
  */
 void snake_init() {
-    int j = x;
+    int j = x;endwin();
     for (int i = 0; i < head; ++i) {
         field[y][++j - head] = i + 1;
     }
@@ -329,12 +451,9 @@ void start_screen() {
 
     }
     attr_off(COLOR_PAIR(4),0);
-
-    wait_opponent_join_screen();
 }
 
 void wait_opponent_join_screen() {
-    //system("clear");
     draw_arena();
 
     attr_on(COLOR_PAIR(1),0);
@@ -358,29 +477,15 @@ void wait_opponent_join_screen() {
     mvprintw(M/2 + 3,  N/2 + 2, "      	");
     attr_off(COLOR_PAIR(3),0);
 
-    attr_on(COLOR_PAIR(4),0);
-    while (getch() != '\n')  /// treba doplnit logiku ze ked dostane od supera "play" zacne
-    {
-        mvprintw(M/2 + 6,  N/2 - 15 , "Waiting for OPPONENT to join.  ");
-        move(M + 1, 0);
-        refresh();
-        usleep(100000);
-        mvprintw(M/2 + 6,  N/2 - 15 , "Waiting for OPPONENT to join.. ");
-        move(M + 1, 0);
-        refresh();
-        usleep(100000);
-        mvprintw(M/2 + 6,  N/2 - 15 , "Waiting for OPPONENT to join...");
-        move(M + 1, 0);
-        refresh();
-        usleep(100000);
-
-    }
+    attr_on(COLOR_PAIR(4), 0);
+    mvprintw(M / 2 + 6, N / 2 - 15, "Waiting for OPPONENT to join...");
+    move(M + 2, 0);
+    refresh();
     attr_off(COLOR_PAIR(4),0);
-    wait_opponent_to_start_game_screen();
 }
 
 void wait_opponent_to_start_game_screen() {
-    draw_arena();
+    //draw_arena();
     attr_on(COLOR_PAIR(1),0);
     mvprintw(M/2 - 4, N/2 - 10, "     /            /");
     mvprintw(M/2 - 3,  N/2 - 10, "   \\/          \\/ ");
@@ -392,27 +497,14 @@ void wait_opponent_to_start_game_screen() {
     attr_off(COLOR_PAIR(1),0);
     mvprintw(M/2 + 4,  N/2 - 15, " Opponent JOINED SUCCESSFULLY.");
 
-    attr_on(COLOR_PAIR(4),0);
-    while (getch() != '\n')  /// treba doplnit logiku ze ked dostane od supera "play" zacne
-    {
-        mvprintw(M/2 + 6,  N/2 - 18 , "Waiting for OPPONENT to START GAME.  ");
-        move(M + 1, 0);
-        refresh();
-        usleep(100000);
-        mvprintw(M/2 + 6,  N/2 - 18 , "Waiting for OPPONENT to START GAME.. ");
-        move(M + 1, 0);
-        refresh();
-        usleep(100000);
-        mvprintw(M/2 + 6,  N/2 - 18 , "Waiting for OPPONENT to START GAME...");
-        move(M + 1, 0);
-        refresh();
-        usleep(100000);
+    attr_on(COLOR_PAIR(4), 0);
+    mvprintw(M / 2 + 6, N / 2 - 18, "Waiting for OPPONENT to START GAME...");
+    move(M + 2, 0);
+    refresh();
+    usleep(100000);
 
-
-    }
     attr_off(COLOR_PAIR(4),0);
-    play = 1;
-};
+}
 
 void loser_screen() {
     //system("clear");
