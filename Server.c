@@ -14,17 +14,28 @@
 typedef struct game_data {
     int socket_descriptor;
     int play;
+    int writeIndex;
+    int readIndex;
+    char ** server_buffer;
     pthread_mutex_t* mut;
     pthread_cond_t* is_game_on;
+    pthread_cond_t* can_read;
 } DATA;
 
-int field[M][N] = {0}; /// Pozicia pre hraca 1
+int field1[M][N] = {0}; /// Pozicia pre hraca 1
+int field2[M][N] = {0}; /// Pozicia pre hraca 2
 int direction = 2; /// Smer pohybu (1-4 clockwise)
-int head = 5;
-int tail = 1;
-int y = M / 4;
-int x = 10;
-int current_score = 0;
+int head1 = 5;
+int tail1 = 1;
+int y_1 = M / 4;
+int x1 = 10;
+int current_score1 = 0;
+
+int head2 = 5;
+int tail2 = 1;
+int y2 = (M / 4) * 3 + 1;
+int x2 = N - 10;
+int current_score2 = 0;
 
 int fruit_generated = 0;
 int fruit_x = 10;
@@ -32,6 +43,14 @@ int fruit_y = 7;
 int fruit_value = 0;
 
 int play = 0;
+
+/**
+ * 0 - nehra sa
+ * 1 - vitaz je hrac jedna (server)
+ * 2 - vitaz je hrac dva (klient)
+ * 3 - hra sa
+ */
+int game_status = 0;
 
 int sockt, newsockt;
 socklen_t cli_len;
@@ -41,6 +60,7 @@ char buffer[256];
 
 pthread_mutex_t mut;
 pthread_cond_t cond1;
+pthread_cond_t cond2;
 
 pthread_t server_player;
 pthread_t client;
@@ -60,15 +80,18 @@ void generate_fruit();
 void eat_fruit();
 void check_collision();
 void step(int change);
+void share_info();
 void start_screen();
 void loser_screen();
 void winner_screen();
 void wait_opponent_join_screen();
 void wait_opponent_to_start_game_screen();
+int send_message(char *message);
 
 int main(int argc, char *argv[]) {
     pthread_mutex_init(&mut, NULL);
     pthread_cond_init(&cond1, NULL);
+    pthread_cond_init(&cond2, NULL);
 
     initscr();
     cbreak();
@@ -93,8 +116,9 @@ int main(int argc, char *argv[]) {
         connect_client(argv);
     }
 
+    char* array[20];
     /// Create threads
-    DATA data = {newsockt, 1, &mut, &cond1};
+    DATA data = {newsockt, 1, 0, 0, array, &mut, &cond1, &cond2};
 
     pthread_create(&server_player, NULL, &play_game, &data);
     pthread_create(&client, NULL, &listen_client, &data);
@@ -180,7 +204,14 @@ void* play_game(void* arg) {
     play = data->play;
     pthread_mutex_unlock(data->mut);
 
+
     while(play) {
+        /// 1. Odosli udaje
+        share_info();
+        /// 2. Nacitaj udaje zo struktury
+        /// Pokial bude struktura prazdna (readI == writeI) => cakaj na data.can_read
+
+
         pthread_mutex_lock(data->mut);
         play = data->play;
         pthread_mutex_unlock(data->mut);
@@ -219,9 +250,9 @@ void* play_game(void* arg) {
 
     sleep(2);
 
-    if (current_score == 0)
+    if (current_score1 == 0)
         loser_screen();
-    if (current_score > 0)
+    if (current_score1 > 0)
         winner_screen();
 
 }
@@ -231,15 +262,11 @@ void * listen_client(void* arg) {
     DATA* data = (DATA*) arg;
     char buffer[201];
     bzero(buffer,201);
-    while (data->play && (len = read(data->socket_descriptor, buffer, 200))) {
+    while (data->play && (len = read(newsockt, buffer, 200))) {
         if (strcmp(buffer, "play") == 0) {
-            bzero(buffer, 201);
-            strcpy(buffer, "ok");
-            write(data->socket_descriptor, buffer, strlen(buffer));
             pthread_cond_signal(data->is_game_on);
         }
     }
-    mvprintw(M + 3, 0, "Uz som skoncil!");
     pthread_mutex_lock(data->mut);
     data->play = 0;
     pthread_mutex_unlock(data->mut);
@@ -249,18 +276,20 @@ void * listen_client(void* arg) {
  * Initialization of snake
  */
 void snake_init() {
-    int j = x;endwin();
-    for (int i = 0; i < head; ++i) {
-        field[y][++j - head] = i + 1;
+    int j1 = x1;
+    int j2 = x2;
+    for (int i = 1; i <= head1; ++i) {
+        field1[y_1][++j1 - head1] = i;
+        field2[y2][j2++] = head2 - (i - 1);
     }
 }
 
 void draw_game() {
     for(int i = 1; i <= M - 1; i++){
         for (int j = 1; j <= N - 1; j++) {
-             if ((field[i][j] >= tail) && (field[i][j] < head)) {
+             if (((field1[i][j] >= tail1) && (field1[i][j] < head1)) || ((field2[i][j] >= tail2) && (field2[i][j] < head2))) {
                 mvprintw(i, j, "o");
-            } else if (field[i][j] == head) {
+            } else if ((field1[i][j] == head1) || (field2[i][j] == head2)) {
                  mvprintw(i, j, "x");
             } else if (fruit_generated == 1 && j == fruit_x && i == fruit_y) {
                  mvprintw(i, j, "%d",fruit_value);
@@ -270,7 +299,7 @@ void draw_game() {
             /// !!! Bacha na ELSE vetvu !!!
         }
     }
-    mvprintw(M + 2, (N/2) - 16, "Current Score: %d  HighScore: %d",current_score, 100);
+    mvprintw(M + 2, (N/2) - 17, "Your Score: %d  Opponent's Score: %d", current_score1, current_score2);
     move(M + 3, 0);
     refresh();
 }
@@ -328,7 +357,7 @@ void generate_fruit() {
 
     fruit_value = (rand() % 3) + 1;
     /// Pokial sa vygeneruje napr v tele hada tak sa nezobrazi
-    if (field[fruit_y][fruit_x] == 0)
+    if (field1[fruit_y][fruit_x] == 0)
         fruit_generated = 1;
 }
 
@@ -336,11 +365,11 @@ void generate_fruit() {
  * Checks if snake is at fruit position
  */
 void eat_fruit(){
-    if ((fruit_x) == x && fruit_y == y) {
+    if ((fruit_x) == x1 && fruit_y == y_1) {
         fruit_generated = 0;
         for (int i = 0; i < fruit_value; ++i) {
-            tail--;
-            current_score++;
+            tail1--;
+            current_score1++;
         }
     }
 }
@@ -349,7 +378,7 @@ void eat_fruit(){
  * Checks snake collision with itself
  */
 void check_collision() {
-    if (field[y][x] != 0)
+    if (field1[y_1][x1] != 0)
         play = 0;
 }
 
@@ -385,20 +414,20 @@ void step(int change) {
 
     switch (direction) {
         case 1:
-            if (y-- <= 1)
-                y = M - 1;
+            if (y_1-- <= 1)
+                y_1 = M - 1;
             break;
         case 2:
-            if (x++ >= N - 1)
-                x = 1;
+            if (x1++ >= N - 1)
+                x1 = 1;
             break;
         case 3:
-            if (y++ >= M - 1)
-                y = 1;
+            if (y_1++ >= M - 1)
+                y_1 = 1;
             break;
         case 4:
-            if (x-- <= 1)
-                x = N - 1;
+            if (x1-- <= 1)
+                x1 = N - 1;
             break;
         default:
             break;
@@ -407,16 +436,24 @@ void step(int change) {
     eat_fruit();
     check_collision();
 
-    field[y][x] = ++head;
+    field1[y_1][x1] = ++head1;
 
-    /// shift tail
+    /// shift tail1
     for (int i = 0; i < M; ++i) {
         for (int j = 0; j < N; ++j) {
-            if (field[i][j] == tail)
-                field[i][j] = 0;
+            if (field1[i][j] == tail1)
+                field1[i][j] = 0;
         }
     }
-    tail++;
+    tail1++;
+}
+
+void share_info() {
+    char info[256];
+    bzero(info, strlen(info));
+    sprintf(info, "%d;%d;%d;%d;%d;%d;%d;%d", x1, y_1, head1, tail1, current_score1, fruit_x, fruit_y, game_status);
+    //mvprintw(M + 4, 0, info);
+    send_message(info);
 }
 
 void start_screen() {
@@ -522,7 +559,7 @@ void loser_screen() {
     attr_off(COLOR_PAIR(3),0);
 
     mvprintw(M/2 + 4,  N/2 - 11,"	   Game OVER!");
-    mvprintw(M/2 + 5,  N/2 - 11,"	 Your SCORE: %d !", current_score);
+    mvprintw(M/2 + 5,  N/2 - 11, "	 Your SCORE: %d !", current_score1);
 
     mvprintw(M + 2, (N/2) - 16, "                                    ");
     refresh();
@@ -551,7 +588,7 @@ void winner_screen() {
     attr_off(COLOR_PAIR(4),0);
 
     mvprintw(M/2 + 4, N/2 - 10,"     You WON!");
-    mvprintw(M/2 + 5, N/2 - 10,"  Your SCORE: %d !", current_score);
+    mvprintw(M/2 + 5, N/2 - 10, "  Your SCORE: %d !", current_score1);
 
     mvprintw(M + 2, (N/2) - 16, "                                    ");
     refresh();
@@ -562,5 +599,11 @@ void winner_screen() {
         move(M + 1, 0);
     }
     attr_off(COLOR_PAIR(1),0);
+}
 
+int send_message(char *message) {
+    n = write(newsockt, message, strlen(message));
+    if (n < 0)
+        return -1;
+    return 0;
 }

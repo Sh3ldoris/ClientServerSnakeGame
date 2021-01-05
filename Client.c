@@ -16,17 +16,29 @@
 typedef struct game_data {
     int socket_descriptor;
     int play;
+    int writeIndex;
+    int readIndex;
+    char** server_buffer;
+    int count;
     pthread_mutex_t* mut;
     pthread_cond_t* is_game_on;
+    pthread_cond_t* can_read;
 } DATA;
 
-int field[M][N] = {0}; /// Pozicia pre hraca 1
-int direction = 2; /// Smer pohybu (1-4 clockwise)
-int head = 5;
-int tail = 1;
-int y = M / 4;
-int x = 10;
-int current_score = 0;
+int field1[M][N] = {0}; /// Pozicia pre hraca 1
+int field2[M][N] = {0}; /// Pozicia pre hraca 2
+int direction = 4; /// Smer pohybu (1-4 clockwise)
+int head1 = 5;
+int tail1 = 1;
+int y_1 = (M / 4) * 3 + 1;
+int x1 = N - 10;
+int current_score1 = 0;
+
+int head2 = 5;
+int tail2 = 1;
+int y2 = M / 4;
+int x2 = 10;
+int current_score2 = 0;
 
 int fruit_generated = 0;
 int fruit_x = 10;
@@ -34,6 +46,7 @@ int fruit_y = 7;
 int fruit_value = 0;
 
 int play = 0;
+int game_status = 0;
 
 int sockt, n;
 struct sockaddr_in serv_addr;
@@ -43,6 +56,7 @@ char buffer[256];
 
 pthread_mutex_t mut;
 pthread_cond_t cond1;
+pthread_cond_t cond2;
 
 pthread_t server_player;
 pthread_t client;
@@ -57,18 +71,19 @@ void snake_init();
 void draw_arena();
 void draw_game_over();
 void countdown();
-void generate_fruit();
 void eat_fruit();
 void check_collision();
 void step(int change);
 void start_screen();
 void loser_screen();
 void winner_screen();
+void set_values(char args[256]);
 int send_message(char *message);
 
 int main(int argc, char *argv[]) {
     pthread_mutex_init(&mut, NULL);
     pthread_cond_init(&cond1, NULL);
+    pthread_cond_init(&cond2, NULL);
 
     if (argc < 2) {
         fprintf(stderr,"usage %s port\n", argv[0]);
@@ -93,9 +108,9 @@ int main(int argc, char *argv[]) {
     srand(time(NULL));
 
     start_screen();
-
+    char * array[256];
     /// Create threads
-    DATA data = {sockt, 1, &mut, &cond1};
+    DATA data = {sockt, 1, 1, 1, array, 0, &mut, &cond1, &cond2};
 
     pthread_create(&client, NULL, &play_game, &data);
     pthread_create(&server_player, NULL, &listen_server, &data);
@@ -104,6 +119,7 @@ int main(int argc, char *argv[]) {
     pthread_join(client, NULL);
 
     pthread_cond_destroy(&cond1);
+    pthread_cond_destroy(&cond2);
     pthread_mutex_destroy(&mut);
 
     close(sockt);
@@ -158,7 +174,7 @@ void* play_game(void* arg) {
     DATA* data = (DATA*) arg;
 
     int c = 0;
-    int direction_change = 2;
+    int direction_change = direction;
 
     snake_init();
     draw_arena();
@@ -167,10 +183,25 @@ void* play_game(void* arg) {
     countdown();
 
     while(play) {
-        /// Generate fruit
-        if (fruit_generated == 0) {
-            generate_fruit();
+
+
+        /// 1. Posli udaje na server
+        /// 2. Nastav udaje
+        pthread_mutex_lock(data->mut);
+        while (data->count <= 0) {
+            pthread_cond_wait(data->can_read, data->mut);
         }
+
+        if (data->count > 0){
+            mvprintw(M + 6, 0, "Citam na 1: %s       ", data->server_buffer[data->readIndex]);
+            if (data->readIndex++ == 21)
+                data->readIndex = 1;
+            data->count--;
+        }
+/*        mvprintw(M + 4, 0, "Aktualne zapisny %d  ", data->writeIndex);
+        if  (data->writeIndex == 2)
+            mvprintw(M + 6, 0, "Citam na 1: %s       ", data->server_buffer[1]);*/
+        pthread_mutex_unlock(data->mut);
 
         /// Print play_game area
         draw_game();
@@ -191,6 +222,7 @@ void* play_game(void* arg) {
                 direction_change = 3;
         }
 
+
         pthread_mutex_lock(data->mut);
         step(direction_change);
         data->play = play;
@@ -204,34 +236,65 @@ void* play_game(void* arg) {
 
     sleep(2);
 
-    if (current_score == 0)
+    if (current_score1 == 0)
         loser_screen();
-    if (current_score > 0)
+    if (current_score1 > 0)
         winner_screen();
+    return NULL;
 
 }
 
 void * listen_server(void* arg) {
     //TODO: Implement client disconnection
     //TODO: Create message transfer
+    DATA* data = (DATA*) arg;
+
+    /*for (int i = 1; i < 21; ++i) {
+        pthread_mutex_lock(data->mut);
+        data->server_buffer[i] = "fsgs";
+        pthread_mutex_unlock(data->mut);
+    }*/
+
+    while (play == 1) {
+        sleep(1);
+        char buff[256];
+        bzero(buff, 256);
+        n = read(sockt, buff, 255);
+
+        pthread_mutex_lock(data->mut);
+        data->server_buffer[data->writeIndex] = buff;
+        if  (data->writeIndex++ == 21)
+            data->writeIndex = 1;
+        data->count++;
+        pthread_cond_signal(data->can_read);
+
+        pthread_mutex_unlock(data->mut);
+
+        pthread_mutex_lock(data->mut);
+
+        pthread_mutex_unlock(data->mut);
+    }
+    return NULL;
 }
 
 /**
  * Initialization of snake
  */
 void snake_init() {
-    int j = x;
-    for (int i = 0; i < head; ++i) {
-        field[y][++j - head] = i + 1;
+    int j1 = x1;
+    int j2 = x2;
+    for (int i = 1; i <= head1; ++i) {
+        field1[y_1][j1++] = head1 - (i - 1);
+        field2[y2][++j2 - head2] = i;
     }
 }
 
 void draw_game() {
     for(int i = 1; i <= M - 1; i++){
         for (int j = 1; j <= N - 1; j++) {
-            if ((field[i][j] >= tail) && (field[i][j] < head)) {
+            if (((field1[i][j] >= tail1) && (field1[i][j] < head1)) || ((field2[i][j] >= tail2) && (field2[i][j] < head2))) {
                 mvprintw(i, j, "o");
-            } else if (field[i][j] == head) {
+            } else if ((field1[i][j] == head1) || (field2[i][j] == head2)) {
                 mvprintw(i, j, "x");
             } else if (fruit_generated == 1 && j == fruit_x && i == fruit_y) {
                 mvprintw(i, j, "%d",fruit_value);
@@ -241,7 +304,7 @@ void draw_game() {
             /// !!! Bacha na ELSE vetvu !!!
         }
     }
-    mvprintw(M + 2, (N/2) - 16, "Current Score: %d  HighScore: %d",current_score, 100);
+    mvprintw(M + 2, (N/2) - 17, "Your Score: %d  Opponent's Score: %d", current_score1, current_score2);
     move(M + 3, 0);
     refresh();
 }
@@ -293,25 +356,15 @@ void countdown() {
     }
 }
 
-void generate_fruit() {
-    fruit_x = (rand() % (N - 2) ) + 1;
-    fruit_y = (rand() % (M - 2) ) + 1;
-
-    fruit_value = (rand() % 3) + 1;
-    /// Pokial sa vygeneruje napr v tele hada tak sa nezobrazi
-    if (field[fruit_y][fruit_x] == 0)
-        fruit_generated = 1;
-}
-
 /**
  * Checks if snake is at fruit position
  */
 void eat_fruit(){
-    if ((fruit_x) == x && fruit_y == y) {
+    if ((fruit_x) == x1 && fruit_y == y_1) {
         fruit_generated = 0;
         for (int i = 0; i < fruit_value; ++i) {
-            tail--;
-            current_score++;
+            tail1--;
+            current_score1++;
         }
     }
 }
@@ -320,7 +373,7 @@ void eat_fruit(){
  * Checks snake collision with itself
  */
 void check_collision() {
-    if (field[y][x] != 0)
+    if (field1[y_1][x1] != 0)
         play = 0;
 }
 
@@ -356,20 +409,20 @@ void step(int change) {
 
     switch (direction) {
         case 1:
-            if (y-- <= 1)
-                y = M - 1;
+            if (y_1-- <= 1)
+                y_1 = M - 1;
             break;
         case 2:
-            if (x++ >= N - 1)
-                x = 1;
+            if (x1++ >= N - 1)
+                x1 = 1;
             break;
         case 3:
-            if (y++ >= M - 1)
-                y = 1;
+            if (y_1++ >= M - 1)
+                y_1 = 1;
             break;
         case 4:
-            if (x-- <= 1)
-                x = N - 1;
+            if (x1-- <= 1)
+                x1 = N - 1;
             break;
         default:
             break;
@@ -378,16 +431,16 @@ void step(int change) {
     eat_fruit();
     check_collision();
 
-    field[y][x] = ++head;
+    field1[y_1][x1] = ++head1;
 
-    /// shift tail
+    /// shift tail1
     for (int i = 0; i < M; ++i) {
         for (int j = 0; j < N; ++j) {
-            if (field[i][j] == tail)
-                field[i][j] = 0;
+            if (field1[i][j] == tail1)
+                field1[i][j] = 0;
         }
     }
-    tail++;
+    tail1++;
 }
 
 void start_screen() {
@@ -448,7 +501,7 @@ void loser_screen() {
     attr_off(COLOR_PAIR(3),0);
 
     mvprintw(M/2 + 4,  N/2 - 11,"	   Game OVER!");
-    mvprintw(M/2 + 5,  N/2 - 11,"	 Your SCORE: %d !", current_score);
+    mvprintw(M/2 + 5,  N/2 - 11, "	 Your SCORE: %d !", current_score1);
 
     mvprintw(M + 2, (N/2) - 16, "                                    ");
     refresh();
@@ -477,7 +530,7 @@ void winner_screen() {
     attr_off(COLOR_PAIR(4),0);
 
     mvprintw(M/2 + 4, N/2 - 10,"     You WON!");
-    mvprintw(M/2 + 5, N/2 - 10,"  Your SCORE: %d !", current_score);
+    mvprintw(M/2 + 5, N/2 - 10, "  Your SCORE: %d !", current_score1);
 
     mvprintw(M + 2, (N/2) - 16, "                                    ");
     refresh();
@@ -491,11 +544,63 @@ void winner_screen() {
 
 }
 
+void set_values(char args[256]) {
+    int i = 5;
+    /*char * token = strtok(args, ";");
+        while( token != NULL ) {
+            switch (i) {
+                case 0:
+                    x2 = atoi(token);
+                    break;
+                case 1:
+                    y2 = atoi(token);
+                    break;
+                case 2:
+                    head2 = atoi(token);
+                    break;
+                case 3:
+                    tail2 = atoi(token);
+                    break;
+                case 4:
+                    current_score2 = atoi(token);
+                    break;
+                case 5:
+                    fruit_x = atoi(token);
+                    break;
+                case 6:
+                    fruit_y = atoi(token);
+                    break;
+                case 7:
+                    game_status = atoi(token);
+                    break;
+                default:
+                    mvprintw(M + 1, 0, "Something goes wrong!");
+            }
+            i++;
+            token = strtok(NULL, ";");
+        }*/
+    mvprintw(M + 5, 0, args);
+
+    /*char string[50];
+    bzero(string, 50);
+    strcpy(string, args);
+    // Extract the first token
+    char * token = strtok(string, ";");
+    // loop through the string to extract all other tokens
+    while( token != NULL ) {
+        mvprintw(M + i, 0, " %s", token ); //printing each token
+        i++;
+        token = strtok(NULL, ";"); }
+        */
+
+}
+
 int send_message(char *message) {
     bzero(buffer,256);
     strcpy(buffer, message);
     n = write(sockt, buffer, strlen(buffer));
     if (n < 0)
         return -1;
+    bzero(buffer,256);
     return 0;
 }
