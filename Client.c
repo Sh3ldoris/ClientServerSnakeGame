@@ -23,6 +23,7 @@ typedef struct game_data {
     pthread_mutex_t* mut;
     pthread_cond_t* is_game_on;
     pthread_cond_t* can_read;
+    pthread_cond_t* can_write;
 } DATA;
 
 int field1[M][N] = {0}; /// Pozicia pre hraca 1
@@ -57,6 +58,7 @@ char buffer[256];
 pthread_mutex_t mut;
 pthread_cond_t cond1;
 pthread_cond_t cond2;
+pthread_cond_t cond3;
 
 pthread_t server_player;
 pthread_t client;
@@ -84,6 +86,7 @@ int main(int argc, char *argv[]) {
     pthread_mutex_init(&mut, NULL);
     pthread_cond_init(&cond1, NULL);
     pthread_cond_init(&cond2, NULL);
+    pthread_cond_init(&cond3, NULL);
 
     if (argc < 2) {
         fprintf(stderr,"usage %s port\n", argv[0]);
@@ -110,7 +113,7 @@ int main(int argc, char *argv[]) {
     start_screen();
     char * array[256];
     /// Create threads
-    DATA data = {sockt, 1, 1, 1, array, 0, &mut, &cond1, &cond2};
+    DATA data = {sockt, 1, 1, 1, array, 0, &mut, &cond1, &cond2, &cond3};
 
     pthread_create(&client, NULL, &play_game, &data);
     pthread_create(&server_player, NULL, &listen_server, &data);
@@ -120,6 +123,7 @@ int main(int argc, char *argv[]) {
 
     pthread_cond_destroy(&cond1);
     pthread_cond_destroy(&cond2);
+    pthread_cond_destroy(&cond3);
     pthread_mutex_destroy(&mut);
 
     close(sockt);
@@ -167,7 +171,7 @@ void connect_to_server(char *argv[]) {
         exit(4);
     }
 
-    usleep(10000);
+    usleep(100);
 }
 
 void* play_game(void* arg) {
@@ -184,19 +188,26 @@ void* play_game(void* arg) {
 
     while(play) {
 
-
-        /// 1. Posli udaje na server
+        /// 1. Posli udaje na server -- toto je skor nacitaj udaje z buffra of servra
         /// 2. Nastav udaje
         pthread_mutex_lock(data->mut);
         while (data->count <= 0) {
             pthread_cond_wait(data->can_read, data->mut);
+            mvprintw(M + 8, 0, "READER CAKA                                                                      ");
         }
 
         if (data->count > 0){
-            mvprintw(M + 6, 0, "Citam na 1: %s       ", data->server_buffer[data->readIndex]);
+            char buf[256];
+            bzero(buf,256);
+            strcpy(buf,data->server_buffer[data->readIndex]);
+
+            mvprintw(M + 8, 0, "READER: %s     ", buf);
+            mvprintw(M + 9, 0, "READER cita z indexu %d:                                                                              ",
+                     data->readIndex);
             if (data->readIndex++ == 21)
                 data->readIndex = 1;
             data->count--;
+            pthread_cond_signal(data->can_write);
         }
 /*        mvprintw(M + 4, 0, "Aktualne zapisny %d  ", data->writeIndex);
         if  (data->writeIndex == 2)
@@ -222,13 +233,12 @@ void* play_game(void* arg) {
                 direction_change = 3;
         }
 
-
         pthread_mutex_lock(data->mut);
         step(direction_change);
         data->play = play;
         pthread_mutex_unlock(data->mut);
 
-        usleep(300000);
+        //usleep(30);
     }
     refresh();
 
@@ -256,13 +266,22 @@ void * listen_server(void* arg) {
     }*/
 
     while (play == 1) {
-        sleep(1);
+        usleep(200000);
         char buff[256];
         bzero(buff, 256);
         n = read(sockt, buff, 255);
 
         pthread_mutex_lock(data->mut);
+        if (data->writeIndex == 1 && data->count > 0) {
+            pthread_cond_wait(data->can_write, data->mut);
+            mvprintw(M + 6, 0, "Writer caka:                                      ");
+        }
+
         data->server_buffer[data->writeIndex] = buff;
+
+        mvprintw(M + 6, 0, "WRITER %s:    ",data->server_buffer[data->writeIndex]);
+        mvprintw(M + 7, 0, "WRITER pise na index %d:                                                                              ",
+                 data->writeIndex);
         if  (data->writeIndex++ == 21)
             data->writeIndex = 1;
         data->count++;
@@ -270,9 +289,6 @@ void * listen_server(void* arg) {
 
         pthread_mutex_unlock(data->mut);
 
-        pthread_mutex_lock(data->mut);
-
-        pthread_mutex_unlock(data->mut);
     }
     return NULL;
 }

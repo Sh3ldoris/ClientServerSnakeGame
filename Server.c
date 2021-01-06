@@ -20,6 +20,7 @@ typedef struct game_data {
     pthread_mutex_t* mut;
     pthread_cond_t* is_game_on;
     pthread_cond_t* can_read;
+    pthread_cond_t* can_write;
 } DATA;
 
 int field1[M][N] = {0}; /// Pozicia pre hraca 1
@@ -242,7 +243,7 @@ void* play_game(void* arg) {
 
         step(direction_change);
 
-        usleep(300000);
+        usleep(200000);
     }
     refresh();
 
@@ -454,6 +455,7 @@ void share_info() {
     sprintf(info, "%d;%d;%d;%d;%d;%d;%d;%d", x1, y_1, head1, tail1, current_score1, fruit_x, fruit_y, game_status);
     //mvprintw(M + 4, 0, info);
     send_message(info);
+    usleep(1000);
 }
 
 void start_screen() {
