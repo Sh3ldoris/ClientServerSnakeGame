@@ -28,15 +28,16 @@ int y2 = M / 4;
 int x2 = 10;
 int current_score2 = 0;
 
-int fruit_generated = 0;
+int fruit_generated = 1;
 int fruit_x = 10;
 int fruit_y = 7;
 int fruit_value = 0;
 
-int play = 0;
+int play = 1;
 int game_status = 0;
 
 int sockt, n;
+int sockfd;
 struct sockaddr_in serv_addr;
 struct hostent* server;
 
@@ -65,11 +66,35 @@ int send_message(char *message);
 
 int main(int argc, char *argv[]) {
 
-    if (argc < 2) {
-        fprintf(stderr,"usage %s port\n", argv[0]);
+    if (argc < 3) {
+        fprintf(stderr,"usage %s hostname port\n", argv[0]);
         return 1;
-    } else {
-        connect_to_server(argv);
+    }
+
+    server = gethostbyname(argv[1]);
+    if (server == NULL) {
+        fprintf(stderr, "Error, no such host\n");
+        return 2;
+    }
+
+    bzero((char*)&serv_addr, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    bcopy(
+            (char*)server->h_addr,
+            (char*)&serv_addr.sin_addr.s_addr,
+            server->h_length
+    );
+    serv_addr.sin_port = htons(atoi(argv[2]));
+
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        perror("Error creating socket");
+        return 3;
+    }
+
+    if(connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
+        perror("Error connecting to socket");
+        return 4;
     }
 
     initscr();
@@ -88,10 +113,136 @@ int main(int argc, char *argv[]) {
     srand(time(NULL));
 
     start_screen();
+    bzero(buffer,256);
+    strcpy(buffer,"play");
+    n = write(sockfd, buffer, strlen(buffer));
+    if (n < 0)
+    {
+        perror("Error writing to socket");
+        return 5;
+    }
 
-    play_game();
 
-    close(sockt);
+    int c = 0;
+    int direction_change = direction;
+
+    snake_init();
+    draw_arena();
+
+    /// Countdown from 3
+    //countdown();
+
+
+    //get_info();
+
+    while(play) {
+        /*bzero(buffer,256);
+        n = read(sockfd, buffer, 255);
+        if (n < 0)
+        {
+            perror("Error reading from socket");
+            return 6;
+        }
+
+        mvprintw(M+4, 0, "Udaje zo servera: %s", buffer);*//*
+        int n = 0;
+        n = read(sockfd, &x2, sizeof(x2));
+        if (n < 0) {
+            perror("Error writing to socket");
+            return 6;
+        }
+        n = read(sockfd, &y2, sizeof(y2));
+        if (n < 0) {
+            perror("Error writing to socket");
+            return 6;
+        }
+        n = read(sockfd, &head2, sizeof(head2));
+        if (n < 0) {
+            perror("Error writing to socket");
+            return 6;
+        }
+
+        field2[y2][x2] = head2;
+
+        n = read(sockfd, &tail2, sizeof(tail2));
+        if (n < 0) {
+            perror("Error writing to socket");
+            return 6;
+        }
+        n = read(sockfd, &current_score2, sizeof(current_score2));
+        if (n < 0) {
+            perror("Error writing to socket");
+            return 6;
+        }
+        n = read(sockfd, &fruit_x, sizeof(fruit_x));
+        if (n < 0) {
+            perror("Error writing to socket");
+            return 6;
+        }
+        n = read(sockfd, &fruit_y, sizeof(fruit_y));
+        if (n < 0) {
+            perror("Error writing to socket");
+            return 6;
+        }
+        n = read(sockfd, &fruit_value, sizeof(fruit_value));
+        if (n < 0) {
+            perror("Error writing to socket");
+            return 6;
+        }*/
+
+
+        /// 1. Nastav udaje - zavolaj GET na server
+        //get_info();
+        /// 2. Posli udaje o sebe na server
+        //send_info();
+
+        /// Get input
+        if (key_hit()) {
+            c = getch();
+            if (c == 97)
+                direction_change = 4;
+            if (c == 100)
+                direction_change = 2;
+            if (c == 120)
+                play = 0;
+            if (c == 119)
+                direction_change = 1;
+            if (c == 115)
+                direction_change = 3;
+        }
+
+        mvprintw(M + 1, 45, "P1 : P2");
+        mvprintw(M + 2, 45, "%d : %d ", x1,x2);
+        mvprintw(M + 3, 45, "%d : %d ",y_1,y2);
+        mvprintw(M + 4, 45, "%d : %d",head1,head2);
+        mvprintw(M + 5, 45, "%d : %d",tail1,tail2);
+        mvprintw(M + 6, 45, "%d : %d",current_score1,current_score2);
+        mvprintw(M + 7, 45, "%d",fruit_x);
+        mvprintw(M + 8, 45, "%d",fruit_y);
+        mvprintw(M + 9, 45, "%d",game_status);
+
+        step(direction_change);
+
+        /// Print play_game area
+        draw_game();
+
+
+
+        usleep(200000);
+    }
+    refresh();
+
+    draw_game_over();
+
+    sleep(2);
+
+    if (current_score1 == 0)
+        loser_screen();
+    if (current_score1 > 0)
+        winner_screen();
+
+
+    close(sockfd);
     endwin();
     return 0;
 }
@@ -148,14 +299,17 @@ void play_game() {
     draw_arena();
 
     /// Countdown from 3
-    countdown();
+    //countdown();
+
+
+    //get_info();
 
     while(play) {
 
         /// 1. Nastav udaje - zavolaj GET na server
-        get_info();
+        //get_info();
         /// 2. Posli udaje o sebe na server
-        send_info();
+        //send_info();
 
         /// Print play_game area
         draw_game();
@@ -176,6 +330,9 @@ void play_game() {
         }
 
         step(direction_change);
+
+        eat_fruit();
+        check_collision();
         usleep(300000);
     }
     refresh();
@@ -342,16 +499,16 @@ void step(int change) {
             break;
     }
 
-    eat_fruit();
-    check_collision();
-
     field1[y_1][x1] = ++head1;
+    field2[y2][x2] = ++head2;
 
     /// shift tail1
     for (int i = 0; i < M; ++i) {
         for (int j = 0; j < N; ++j) {
             if (field1[i][j] == tail1)
                 field1[i][j] = 0;
+            if (field2[i][j] == tail2)
+                field2[i][j] = 0;
         }
     }
     tail1++;
@@ -388,11 +545,11 @@ void start_screen() {
 
     }
 
-    if (send_message("play") < 0) {
+    /*if (send_message("play") < 0) {
         endwin();
         exit(5);
     }
-
+*/
     attr_off(COLOR_PAIR(4),0);
     play = 1;
 
@@ -459,13 +616,22 @@ void winner_screen() {
 }
 
 void get_info() {
-    send_message("getinfo");
-    bzero(buffer, strlen(buffer));
-    n = read(sockt, buffer, strlen(buffer));
-    if (n <= 0)
-        exit(5);
 
-    //TODO: set info
+    bzero(buffer,256);
+    strcpy(buffer, "getinfo");
+    n = write(sockt, buffer, strlen(buffer));
+    bzero(buffer, strlen(buffer));
+    mvprintw(M + 8, 0, "Som tu");
+    //usleep(1000);
+
+    n = read(sockt, buffer, strlen(buffer));
+    mvprintw(M + 9, 0, "Odpoved: %d   ", n);
+
+    /*if (n > 0) {
+        //TODO: set info
+        mvprintw(M + 10, 0, "Odpoved servera: %s   ", buffer);
+        break;
+    }*/
     mvprintw(M + 10, 0, "Odpoved servera: %s   ", buffer);
     mvprintw(M + 11, 0, "Koniec GET requestu   ");
 }

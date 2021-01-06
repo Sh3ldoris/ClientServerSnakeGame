@@ -12,37 +12,25 @@
 #define M  18
 
 typedef struct game_data {
-    int socket_descriptor;
-    int play;
-    int writeIndex;
-    int readIndex;
-    char ** server_buffer;
+    int ** field_server;
+    int ** field_client;
+    int head_server;
+    int head_client;
+    int score_server;
+    int score_client;
+    int fruit_x;
+    int fruit_y;
+    int fruit_value;
+    int is_fruit_generated;
+    int direction_change_server;
+    int game_status;
+    int is_drawn;
     pthread_mutex_t* mut;
     pthread_cond_t* is_game_on;
+    pthread_cond_t* can_draw;
     pthread_cond_t* can_read;
 } DATA;
 
-int field1[M][N] = {0}; /// Pozicia pre hraca 1
-int field2[M][N] = {0}; /// Pozicia pre hraca 2
-int direction = 2; /// Smer pohybu (1-4 clockwise)
-int head1 = 5;
-int tail1 = 1;
-int y_1 = M / 4;
-int x1 = 10;
-int current_score1 = 0;
-
-int head2 = 5;
-int tail2 = 1;
-int y2 = (M / 4) * 3 + 1;
-int x2 = N - 10;
-int current_score2 = 0;
-
-int fruit_generated = 0;
-int fruit_x = 10;
-int fruit_y = 7;
-int fruit_value = 0;
-
-int play = 0;
 
 /**
  * 0 - nehra sa
@@ -61,9 +49,10 @@ char buffer[256];
 pthread_mutex_t mut;
 pthread_cond_t cond1;
 pthread_cond_t cond2;
+pthread_cond_t cond3;
 
 pthread_t server_player;
-pthread_t client;
+pthread_t server;
 
 
 void draw_arena();
@@ -71,8 +60,8 @@ int key_hit();
 void connect_client(char *argv[]);
 void draw_game();
 void snake_init();
-void* play_game(void* arg);
-void * listen_client(void* arg);
+void* handle_server_player(void* arg);
+void * handle_game(void* arg);
 void draw_arena();
 void draw_game_over();
 void countdown();
@@ -92,6 +81,7 @@ int main(int argc, char *argv[]) {
     pthread_mutex_init(&mut, NULL);
     pthread_cond_init(&cond1, NULL);
     pthread_cond_init(&cond2, NULL);
+    pthread_cond_init(&cond3, NULL);
 
     initscr();
     cbreak();
@@ -116,23 +106,60 @@ int main(int argc, char *argv[]) {
         connect_client(argv);
     }
 
-    char* array[20];
+    int ** server_field;
+    int ** client_field;
+
+    server_field = malloc(M * sizeof(int *));
+    for (int i = 0; i < M; ++i)
+        server_field[i] = malloc(N * sizeof(int));
+
+    client_field = malloc(M * sizeof(int *));
+    for (int i = 0; i < M; ++i)
+        client_field[i] = malloc(N * sizeof(int));
+
     /// Create threads
-    DATA data = {newsockt, 1, 0, 0, array, &mut, &cond1, &cond2};
-    mvprintw(M+4, 0, "Inicializovanie");
-    pthread_create(&server_player, NULL, &play_game, &data);
-    pthread_create(&client, NULL, &listen_client, &data);
+    DATA data = {
+            server_field,
+            client_field,
+            5,
+            N-11,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            2,
+            3,
+            1,
+            &mut,
+            &cond1,
+            &cond2,
+            &cond3
+    };
+
+    pthread_create(&server_player, NULL, &handle_server_player, &data);
+    pthread_create(&server, NULL, &handle_game, &data);
 
     pthread_join(server_player, NULL);
-    pthread_join(client, NULL);
+    pthread_join(server, NULL);
 
 
     pthread_cond_destroy(&cond1);
     pthread_mutex_destroy(&mut);
 
+    for (int i = 0; i < N; ++i)
+        free(data.field_server[i]);
+    free(data.field_server);
+
+    for (int i = 0; i < N; ++i)
+        free(data.field_client[i]);
+    free(data.field_client);
     close(newsockt);
     close(sockt);
+    system("clear");
     endwin();
+    printf("KKKKKKONIEC\n");
     return 0;
 }
 
@@ -180,68 +207,80 @@ void connect_client(char *argv[]) {
     wait_opponent_to_start_game_screen();
 }
 
-void* play_game(void* arg) {
+void* handle_server_player(void* arg) {
     DATA* data = (DATA*) arg;
 
     pthread_mutex_lock(data->mut);
-
-    if (data->play == 1) {
-        mvprintw(M+4, 0, "Cakanie");
+    if (data->game_status == 3) {
         pthread_cond_wait(data->is_game_on, data->mut);
     }
     pthread_mutex_unlock(data->mut);
-
     int c = 0;
     int direction_change = 2;
 
-    snake_init();
     draw_arena();
-
     /// Countdown from 3
-    countdown();
-
-    pthread_mutex_lock(data->mut);
-    play = data->play;
-    pthread_mutex_unlock(data->mut);
-
-
-    while(play) {
-        /// 1. Odosli udaje
-        /// 2. Nacitaj udaje zo struktury
-        /// Pokial bude struktura prazdna (readI == writeI) => cakaj na data.can_read
-
-
+    //countdown();
+    int game_stat = 3;
+    int ch = 0;
+    int i = 0;
+    while(game_stat == 3) {
+        mvprintw(M + 1, 0, "Zaciatok kroku %d   ", ++i);
+        ch = getch();
+        mvprintw(M + 7, 0, "Klavesa: %d   ", ch);
         pthread_mutex_lock(data->mut);
-        play = data->play;
-        pthread_mutex_unlock(data->mut);
 
-        /// Generate fruit
-        if (fruit_generated == 0) {
-            generate_fruit();
+        while (data->is_drawn == 1) {
+            pthread_cond_wait(data->can_draw, data->mut);
         }
 
-        /// Print play_game area
-        draw_game();
-
-
         /// Get input
-        if (key_hit()) {
-            c = getch();
+        if (ch != ERR) {
+            c = ch;
             if (c == 97)
                 direction_change = 4;
             if (c == 100)
                 direction_change = 2;
             if (c == 120)
-                play = 0;
+                game_stat = 0;
             if (c == 119)
                 direction_change = 1;
             if (c == 115)
                 direction_change = 3;
         }
+        data->direction_change_server = direction_change;
 
-        step(direction_change);
+        for(int i = 1; i <= M - 1; i++){
+            for (int j = 1; j <= N - 1; j++) {
+                if (((data->field_server[i][j] > 0) && (data->field_server[i][j] < data->head_server)) || ((data->field_client[i][j] > 0) && (data->field_client[i][j] < data->head_client))) {
+                    mvprintw(i, j, "o");
+                } else if ((data->field_server[i][j] == data->head_server) || (data->field_client[i][j] == data->head_client)) {
+                    mvprintw(i, j, "x");
+                } else if (data->is_fruit_generated == 1 && j == data->fruit_x && i == data->fruit_y) {
+                    mvprintw(i, j, "%d",data->fruit_value);
+                } else {
+                    mvprintw(i, j, " ");
+                }
+                /// !!! Bacha na ELSE vetvu !!!
+            }
+        }
 
-        usleep(200000);
+        move(M + 10, 0);
+        for(int i = 1; i <= M - 1; i++){
+            for (int j = 1; j <= N - 1; j++) {
+                printw("%d", data->field_server[i][j]);
+            }
+            printw("\n");
+        }
+        printw("\n");
+
+        mvprintw(M + 2, (N/2) - 17, "Your Score: %d  Opponent's Score: %d", data->score_server, data->score_client);
+        move(M + 3, 0);
+        game_stat = data->game_status;
+        data->is_drawn = 1;
+        pthread_mutex_unlock(data->mut);
+        pthread_cond_broadcast(data->can_read);
+        refresh();
     }
     refresh();
 
@@ -249,56 +288,349 @@ void* play_game(void* arg) {
 
     sleep(2);
 
-    if (current_score1 == 0)
-        loser_screen();
-    if (current_score1 > 0)
-        winner_screen();
-
-}
-
-void * listen_client(void* arg) {
-    int len;
-    DATA* data = (DATA*) arg;
-    char buffer[256];
-    bzero(buffer,strlen(buffer));
-    while (data->play && (len = read(newsockt, buffer, strlen(buffer)))) {
-        if (strcmp(buffer, "play") == 0) {
-            mvprintw(M+ 7, 0, "Stlacil play");
-            pthread_cond_signal(data->is_game_on);
-        } /*else if  (strcmp(buffer, "getinfo")) {
-            bzero(buffer, strlen(buffer));
-            strcpy(buffer, "toto su nove udaje zo servera");
-            n = write(newsockt, buffer, strlen(buffer));
-            if  (n < 0)
-                exit(6);
-            mvprintw(M + 10, 0, "GET request koniec  ");
-        }*/
+    switch (game_stat) {
+        case 1:
+            winner_screen();
+            break;
+        case 2:
+            loser_screen();
+            break;
+        default:
+            //TODO: something goes wrong screen
+            break;
     }
+
 }
 
-/**
- * Initialization of snake
- */
-void snake_init() {
+void * handle_game(void* arg) {
+    DATA* data = (DATA*) arg;
+    int len;
+    char buff[256];
+    bzero(buff,256);
+    while (1) {
+        len = read(newsockt, buff, 255);
+        if (strcmp(buff, "play") == 0) {
+            pthread_cond_signal(data->is_game_on);
+            break;
+        }
+    }
+
+    int field1[M][N] = {0}; /// Pozicia pre hraca 1
+    int field2[M][N] = {0}; /// Pozicia pre hraca 2
+    int head1 = 5;
+    int tail1 = 1;
+    int y_1 = M / 4;
+    int x1 = 10;
+    int current_score1 = 0;
+
+    int head2 = 5;
+    int tail2 = 1;
+    int y2 = (M / 4) * 3 + 1;
+    int x2 = N - 10;
+    int current_score2 = 0;
+
+    int fruit_generated = 0;
+    int fruit_x = 10;
+    int fruit_y = 7;
+    int fruit_value = 0;
+
+    int play = 3;
+
+    int direction_change_server;
+    int direction_change_client = 4;
+    int direction_server = 2;
+    int direction_client = 4;
+
     int j1 = x1;
     int j2 = x2;
     for (int i = 1; i <= head1; ++i) {
         field1[y_1][++j1 - head1] = i;
         field2[y2][j2++] = head2 - (i - 1);
     }
+    while (play == 3) {
+        pthread_mutex_lock(data->mut);
+
+        while (data->is_drawn == 0) {
+            pthread_cond_wait(data->can_read, data->mut);
+        }
+
+        //usleep(200000);
+        //sleep(1);
+       /* /// Pocuvame klienta na zmeny pohybu
+        len = read(newsockt, &direction_change_client, sizeof(direction_change_client));
+        if (len < 0) {
+            break;
+        }*/
+        ///Zmena hry
+        direction_change_server = data->direction_change_server;
+
+        if (fruit_generated == 0) {
+            fruit_x = (rand() % (N - 2) ) + 1;
+            fruit_y = (rand() % (M - 2) ) + 1;
+
+            fruit_value = (rand() % 3) + 1;
+            /// Pokial sa vygeneruje napr v tele hada tak sa nezobrazi
+            if ((field1[fruit_y][fruit_x] == 0) || (field2[fruit_y][fruit_x] == 0))
+                fruit_generated = 1;
+        }
+
+        switch (direction_change_server) {
+            case 1:
+                if (direction_server == 3)
+                    break;
+                direction_server = 1;
+                break;
+            case 2:
+                if (direction_server == 4)
+                    break;
+                direction_server = 2;
+                break;
+            case 3:
+                if (direction_server == 1)
+                    break;
+                direction_server = 3;
+                break;
+            case 4:
+                if (direction_server == 2)
+                    break;
+                direction_server = 4;
+                break;
+            default:
+                break;
+        }
+
+        switch (direction_server) {
+            case 1:
+                if (y_1-- <= 1)
+                    y_1 = M - 1;
+                break;
+            case 2:
+                if (x1++ >= N - 1)
+                    x1 = 1;
+                break;
+            case 3:
+                if (y_1++ >= M - 1)
+                    y_1 = 1;
+                break;
+            case 4:
+                if (x1-- <= 1)
+                    x1 = N - 1;
+                break;
+            default:
+                break;
+        }
+
+        switch (direction_change_client) {
+            case 1:
+                if (direction_client == 3)
+                    break;
+                direction_client = 1;
+                break;
+            case 2:
+                if (direction_client == 4)
+                    break;
+                direction_client = 2;
+                break;
+            case 3:
+                if (direction_client == 1)
+                    break;
+                direction_client = 3;
+                break;
+            case 4:
+                if (direction_client == 2)
+                    break;
+                direction_client = 4;
+                break;
+            default:
+                break;
+        }
+
+        switch (direction_client) {
+            case 1:
+                if (y2-- <= 1)
+                    y2 = M - 1;
+                break;
+            case 2:
+                if (x2++ >= N - 1)
+                    x2 = 1;
+                break;
+            case 3:
+                if (y2++ >= M - 1)
+                    y2 = 1;
+                break;
+            case 4:
+                if (x2-- <= 1)
+                    x2 = N - 1;
+                break;
+            default:
+                break;
+        }
+
+        /// Fruit ham check
+        if (fruit_x == x1 && fruit_y == y_1) {
+            fruit_generated = 0;
+            for (int i = 0; i < fruit_value; ++i) {
+                tail1--;
+                current_score1++;
+            }
+        }
+        if (fruit_x == x2 && fruit_y == y2) {
+            fruit_generated = 0;
+            for (int i = 0; i < fruit_value; ++i) {
+                tail2--;
+                current_score2++;
+            }
+        }
+
+        /// Collision check
+        if ((field1[y_1][x1] != 0) || (field2[y_1][x1] != 0)) {
+                play = 2;
+                data->game_status = 2;
+        }
+
+        if ((field2[y2][x2] != 0) ||  (field1[y2][x2] != 0)) {
+            play = 1;
+            data->game_status = 1;
+        }
+
+        //// Step
+        field1[y_1][x1] = ++head1;
+        field2[y2][x2] = ++head2;
+
+        /// shift tail
+        for (int i = 0; i < M; ++i) {
+            for (int j = 0; j < N; ++j) {
+                if (field1[i][j] == tail1)
+                    field1[i][j] = 0;
+                if (field2[i][j] == tail2)
+                    field2[i][j] = 0;
+            }
+        }
+        tail1++;
+        tail2++;
+
+        for (int i = 0; i < M; ++i) {
+            for (int j = 0; j < N; ++j) {
+                data->field_server[i][j] = field1[i][j];
+                data->field_client[i][j] = field2[i][j];
+            }
+        }
+
+        data->head_server = head1;
+        data->head_client = head2;
+
+        data->score_server = current_score1;
+        data->score_client = current_score2;
+
+        data->fruit_x = fruit_x;
+        data->fruit_y = fruit_y;
+        data->fruit_value = fruit_value;
+        data->is_fruit_generated = fruit_generated;
+
+        data->game_status = play;
+
+        data->is_drawn = 0;
+
+        pthread_mutex_unlock(data->mut);
+        pthread_cond_broadcast(data->can_draw);
+        /// Struct medzi server a serverHracom field 1,2 score 1,2, fruit x,y
+        /// Odosielame zmeny
+        /*if (fruit_generated == 0) {
+            generate_fruit();
+        }
+
+        n = write(newsockt, &x1, sizeof(x1));
+        if (n < 0)
+        {
+            perror("Error writing to socket");
+            endwin();
+            exit(5);
+        }
+        usleep(100);
+        n = write(newsockt, &y_1, sizeof(y_1));
+        if (n < 0)
+        {
+            perror("Error writing to socket");
+            endwin();
+            exit(5);
+        }
+        usleep(100);
+        n = write(newsockt, &head1, sizeof(head1));
+        if (n < 0)
+        {
+            perror("Error writing to socket");
+            endwin();
+            exit(5);
+        }
+        usleep(100);
+        n = write(newsockt, &tail1, sizeof(tail1));
+        if (n < 0)
+        {
+            perror("Error writing to socket");
+            endwin();
+            exit(5);
+        }
+        usleep(100);
+        n = write(newsockt, &current_score1, sizeof(current_score1));
+        if (n < 0)
+        {
+            perror("Error writing to socket");
+            endwin();
+            exit(5);
+        }
+        usleep(100);
+        n = write(newsockt, &fruit_x, sizeof(fruit_x));
+        if (n < 0)
+        {
+            perror("Error writing to socket");
+            endwin();
+            exit(5);
+        }
+        usleep(100);
+        n = write(newsockt, &fruit_y, sizeof(fruit_y));
+        if (n < 0)
+        {
+            perror("Error writing to socket");
+            endwin();
+            exit(5);
+        }
+        usleep(100);
+        n = write(newsockt, &fruit_value, sizeof(fruit_value));
+        if (n < 0)
+        {
+            perror("Error writing to socket");
+            endwin();
+            exit(5);
+        }*/
+        usleep(200000);
+    }
+
+    return NULL;
 }
 
-void draw_game() {
+/**
+ * Initialization of snake
+ */
+/*void snake_init() {
+    int j1 = x1;
+    int j2 = x2;
+    for (int i = 1; i <= head1; ++i) {
+        field1[y_1][++j1 - head1] = i;
+        field2[y2][j2++] = head2 - (i - 1);
+    }
+}*/
+
+/*void draw_game() {
     for(int i = 1; i <= M - 1; i++){
         for (int j = 1; j <= N - 1; j++) {
-             if (((field1[i][j] >= tail1) && (field1[i][j] < head1)) || ((field2[i][j] >= tail2) && (field2[i][j] < head2))) {
+            if (((field1[i][j] >= tail1) && (field1[i][j] < head1)) || ((field2[i][j] >= tail2) && (field2[i][j] < head2))) {
                 mvprintw(i, j, "o");
             } else if ((field1[i][j] == head1) || (field2[i][j] == head2)) {
-                 mvprintw(i, j, "x");
+                mvprintw(i, j, "x");
             } else if (fruit_generated == 1 && j == fruit_x && i == fruit_y) {
-                 mvprintw(i, j, "%d",fruit_value);
+                mvprintw(i, j, "%d",fruit_value);
             } else {
-                 mvprintw(i, j, " ");
+                mvprintw(i, j, " ");
             }
             /// !!! Bacha na ELSE vetvu !!!
         }
@@ -306,7 +638,7 @@ void draw_game() {
     mvprintw(M + 2, (N/2) - 17, "Your Score: %d  Opponent's Score: %d", current_score1, current_score2);
     move(M + 3, 0);
     refresh();
-}
+}*/
 
 void draw_arena() {
     move(0,0);
@@ -344,7 +676,7 @@ void draw_game_over() {
 }
 
 void countdown() {
-    draw_game();
+    //draw_game();
     for (int i = 3; i > 0; --i) {
         attr_on(COLOR_PAIR(3),0);
         mvprintw(M / 2, (N/2), "%d", i);
@@ -355,7 +687,7 @@ void countdown() {
     }
 }
 
-void generate_fruit() {
+/*void generate_fruit() {
     fruit_x = (rand() % (N - 2) ) + 1;
     fruit_y = (rand() % (M - 2) ) + 1;
 
@@ -363,12 +695,12 @@ void generate_fruit() {
     /// Pokial sa vygeneruje napr v tele hada tak sa nezobrazi
     if (field1[fruit_y][fruit_x] == 0)
         fruit_generated = 1;
-}
+}*/
 
 /**
  * Checks if snake is at fruit position
  */
-void eat_fruit(){
+/*void eat_fruit(){
     if ((fruit_x) == x1 && fruit_y == y_1) {
         fruit_generated = 0;
         for (int i = 0; i < fruit_value; ++i) {
@@ -376,21 +708,21 @@ void eat_fruit(){
             current_score1++;
         }
     }
-}
+}*/
 
 /**
  * Checks snake collision with itself
  */
-void check_collision() {
+/*void check_collision() {
     if (field1[y_1][x1] != 0)
         play = 0;
-}
+}*/
 
 /**
  * Change direction of movement
  * @param change
  */
-void step(int change) {
+/*void step(int change) {
     switch (change) {
         case 1:
             if (direction == 3)
@@ -437,7 +769,6 @@ void step(int change) {
             break;
     }
 
-    eat_fruit();
     check_collision();
 
     field1[y_1][x1] = ++head1;
@@ -450,16 +781,16 @@ void step(int change) {
         }
     }
     tail1++;
-}
+}*/
 
-void share_info() {
+/*void share_info() {
     char info[256];
     bzero(info, strlen(info));
     sprintf(info, "%d;%d;%d;%d;%d;%d;%d;%d", x1, y_1, head1, tail1, current_score1, fruit_x, fruit_y, game_status);
     //mvprintw(M + 4, 0, info);
     send_message(info);
     usleep(1000);
-}
+}*/
 
 void start_screen() {
     system("clear");
@@ -564,7 +895,7 @@ void loser_screen() {
     attr_off(COLOR_PAIR(3),0);
 
     mvprintw(M/2 + 4,  N/2 - 11,"	   Game OVER!");
-    mvprintw(M/2 + 5,  N/2 - 11, "	 Your SCORE: %d !", current_score1);
+    //mvprintw(M/2 + 5,  N/2 - 11, "	 Your SCORE: %d !", current_score1);
 
     mvprintw(M + 2, (N/2) - 16, "                                    ");
     refresh();
@@ -593,7 +924,7 @@ void winner_screen() {
     attr_off(COLOR_PAIR(4),0);
 
     mvprintw(M/2 + 4, N/2 - 10,"     You WON!");
-    mvprintw(M/2 + 5, N/2 - 10, "  Your SCORE: %d !", current_score1);
+    //mvprintw(M/2 + 5, N/2 - 10, "  Your SCORE: %d !", current_score1);
 
     mvprintw(M + 2, (N/2) - 16, "                                    ");
     refresh();
