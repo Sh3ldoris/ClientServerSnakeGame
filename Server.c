@@ -20,7 +20,6 @@ typedef struct game_data {
     pthread_mutex_t* mut;
     pthread_cond_t* is_game_on;
     pthread_cond_t* can_read;
-    pthread_cond_t* can_write;
 } DATA;
 
 int field1[M][N] = {0}; /// Pozicia pre hraca 1
@@ -120,7 +119,7 @@ int main(int argc, char *argv[]) {
     char* array[20];
     /// Create threads
     DATA data = {newsockt, 1, 0, 0, array, &mut, &cond1, &cond2};
-
+    mvprintw(M+4, 0, "Inicializovanie");
     pthread_create(&server_player, NULL, &play_game, &data);
     pthread_create(&client, NULL, &listen_client, &data);
 
@@ -187,9 +186,9 @@ void* play_game(void* arg) {
     pthread_mutex_lock(data->mut);
 
     if (data->play == 1) {
+        mvprintw(M+4, 0, "Cakanie");
         pthread_cond_wait(data->is_game_on, data->mut);
     }
-
     pthread_mutex_unlock(data->mut);
 
     int c = 0;
@@ -208,7 +207,6 @@ void* play_game(void* arg) {
 
     while(play) {
         /// 1. Odosli udaje
-        share_info();
         /// 2. Nacitaj udaje zo struktury
         /// Pokial bude struktura prazdna (readI == writeI) => cakaj na data.can_read
 
@@ -261,16 +259,21 @@ void* play_game(void* arg) {
 void * listen_client(void* arg) {
     int len;
     DATA* data = (DATA*) arg;
-    char buffer[201];
-    bzero(buffer,201);
-    while (data->play && (len = read(newsockt, buffer, 200))) {
+    char buffer[256];
+    bzero(buffer,strlen(buffer));
+    while (data->play && (len = read(newsockt, buffer, strlen(buffer)))) {
         if (strcmp(buffer, "play") == 0) {
+            mvprintw(M+ 7, 0, "Stlacil play");
             pthread_cond_signal(data->is_game_on);
-        }
+        } /*else if  (strcmp(buffer, "getinfo")) {
+            bzero(buffer, strlen(buffer));
+            strcpy(buffer, "toto su nove udaje zo servera");
+            n = write(newsockt, buffer, strlen(buffer));
+            if  (n < 0)
+                exit(6);
+            mvprintw(M + 10, 0, "GET request koniec  ");
+        }*/
     }
-    pthread_mutex_lock(data->mut);
-    data->play = 0;
-    pthread_mutex_unlock(data->mut);
 }
 
 /**

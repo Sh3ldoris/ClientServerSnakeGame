@@ -13,19 +13,6 @@
 #define N  50
 #define M  18
 
-typedef struct game_data {
-    int socket_descriptor;
-    int play;
-    int writeIndex;
-    int readIndex;
-    char** server_buffer;
-    int count;
-    pthread_mutex_t* mut;
-    pthread_cond_t* is_game_on;
-    pthread_cond_t* can_read;
-    pthread_cond_t* can_write;
-} DATA;
-
 int field1[M][N] = {0}; /// Pozicia pre hraca 1
 int field2[M][N] = {0}; /// Pozicia pre hraca 2
 int direction = 4; /// Smer pohybu (1-4 clockwise)
@@ -55,18 +42,10 @@ struct hostent* server;
 
 char buffer[256];
 
-pthread_mutex_t mut;
-pthread_cond_t cond1;
-pthread_cond_t cond2;
-pthread_cond_t cond3;
-
-pthread_t server_player;
-pthread_t client;
-
 void draw_arena();
 int key_hit();
 void connect_to_server(char *argv[]);
-void* play_game(void* arg);
+void play_game();
 void * listen_server(void* arg);
 void draw_game();
 void snake_init();
@@ -79,14 +58,12 @@ void step(int change);
 void start_screen();
 void loser_screen();
 void winner_screen();
+void get_info();
+void send_info();
 void set_values(char args[256]);
 int send_message(char *message);
 
 int main(int argc, char *argv[]) {
-    pthread_mutex_init(&mut, NULL);
-    pthread_cond_init(&cond1, NULL);
-    pthread_cond_init(&cond2, NULL);
-    pthread_cond_init(&cond3, NULL);
 
     if (argc < 2) {
         fprintf(stderr,"usage %s port\n", argv[0]);
@@ -111,20 +88,8 @@ int main(int argc, char *argv[]) {
     srand(time(NULL));
 
     start_screen();
-    char * array[256];
-    /// Create threads
-    DATA data = {sockt, 1, 1, 1, array, 0, &mut, &cond1, &cond2, &cond3};
 
-    pthread_create(&client, NULL, &play_game, &data);
-    pthread_create(&server_player, NULL, &listen_server, &data);
-
-    pthread_join(server_player, NULL);
-    pthread_join(client, NULL);
-
-    pthread_cond_destroy(&cond1);
-    pthread_cond_destroy(&cond2);
-    pthread_cond_destroy(&cond3);
-    pthread_mutex_destroy(&mut);
+    play_game();
 
     close(sockt);
     endwin();
@@ -174,8 +139,7 @@ void connect_to_server(char *argv[]) {
     usleep(100);
 }
 
-void* play_game(void* arg) {
-    DATA* data = (DATA*) arg;
+void play_game() {
 
     int c = 0;
     int direction_change = direction;
@@ -188,35 +152,13 @@ void* play_game(void* arg) {
 
     while(play) {
 
-        /// 1. Posli udaje na server -- toto je skor nacitaj udaje z buffra of servra
-        /// 2. Nastav udaje
-        pthread_mutex_lock(data->mut);
-        while (data->count <= 0) {
-            pthread_cond_wait(data->can_read, data->mut);
-            mvprintw(M + 8, 0, "READER CAKA                                                                      ");
-        }
-
-        if (data->count > 0){
-            char buf[256];
-            bzero(buf,256);
-            strcpy(buf,data->server_buffer[data->readIndex]);
-
-            mvprintw(M + 8, 0, "READER: %s     ", buf);
-            mvprintw(M + 9, 0, "READER cita z indexu %d:                                                                              ",
-                     data->readIndex);
-            if (data->readIndex++ == 21)
-                data->readIndex = 1;
-            data->count--;
-            pthread_cond_signal(data->can_write);
-        }
-/*        mvprintw(M + 4, 0, "Aktualne zapisny %d  ", data->writeIndex);
-        if  (data->writeIndex == 2)
-            mvprintw(M + 6, 0, "Citam na 1: %s       ", data->server_buffer[1]);*/
-        pthread_mutex_unlock(data->mut);
+        /// 1. Nastav udaje - zavolaj GET na server
+        get_info();
+        /// 2. Posli udaje o sebe na server
+        send_info();
 
         /// Print play_game area
         draw_game();
-
 
         /// Get input
         if (key_hit()) {
@@ -233,12 +175,8 @@ void* play_game(void* arg) {
                 direction_change = 3;
         }
 
-        pthread_mutex_lock(data->mut);
         step(direction_change);
-        data->play = play;
-        pthread_mutex_unlock(data->mut);
-
-        //usleep(30);
+        usleep(300000);
     }
     refresh();
 
@@ -250,47 +188,7 @@ void* play_game(void* arg) {
         loser_screen();
     if (current_score1 > 0)
         winner_screen();
-    return NULL;
 
-}
-
-void * listen_server(void* arg) {
-    //TODO: Implement client disconnection
-    //TODO: Create message transfer
-    DATA* data = (DATA*) arg;
-
-    /*for (int i = 1; i < 21; ++i) {
-        pthread_mutex_lock(data->mut);
-        data->server_buffer[i] = "fsgs";
-        pthread_mutex_unlock(data->mut);
-    }*/
-
-    while (play == 1) {
-        usleep(200000);
-        char buff[256];
-        bzero(buff, 256);
-        n = read(sockt, buff, 255);
-
-        pthread_mutex_lock(data->mut);
-        if (data->writeIndex == 1 && data->count > 0) {
-            pthread_cond_wait(data->can_write, data->mut);
-            mvprintw(M + 6, 0, "Writer caka:                                      ");
-        }
-
-        data->server_buffer[data->writeIndex] = buff;
-
-        mvprintw(M + 6, 0, "WRITER %s:    ",data->server_buffer[data->writeIndex]);
-        mvprintw(M + 7, 0, "WRITER pise na index %d:                                                                              ",
-                 data->writeIndex);
-        if  (data->writeIndex++ == 21)
-            data->writeIndex = 1;
-        data->count++;
-        pthread_cond_signal(data->can_read);
-
-        pthread_mutex_unlock(data->mut);
-
-    }
-    return NULL;
 }
 
 /**
@@ -558,6 +456,25 @@ void winner_screen() {
     }
     attr_off(COLOR_PAIR(1),0);
 
+}
+
+void get_info() {
+    send_message("getinfo");
+    bzero(buffer, strlen(buffer));
+    n = read(sockt, buffer, strlen(buffer));
+    if (n <= 0)
+        exit(5);
+
+    //TODO: set info
+    mvprintw(M + 10, 0, "Odpoved servera: %s   ", buffer);
+    mvprintw(M + 11, 0, "Koniec GET requestu   ");
+}
+
+void send_info() {
+    char info[256];
+    bzero(info, strlen(info));
+    sprintf(info, "%d;%d;%d;%d;%d;%d;%d;%d", x1, y_1, head1, tail1, current_score1, game_status);
+    send_message(info);
 }
 
 void set_values(char args[256]) {
