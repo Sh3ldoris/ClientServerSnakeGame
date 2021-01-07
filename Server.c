@@ -23,6 +23,7 @@ typedef struct game_data {
     int fruit_value;
     int is_fruit_generated;
     int direction_change_server;
+    int direction_change_client;
     int game_status;
     int is_drawn;
     pthread_mutex_t* mut;
@@ -53,6 +54,7 @@ pthread_cond_t cond3;
 
 pthread_t server_player;
 pthread_t server;
+pthread_t client_com;
 
 
 void draw_arena();
@@ -62,6 +64,7 @@ void draw_game();
 void snake_init();
 void* handle_server_player(void* arg);
 void * handle_game(void* arg);
+void* client_communication(void* args);
 void draw_arena();
 void draw_game_over();
 void countdown();
@@ -131,6 +134,7 @@ int main(int argc, char *argv[]) {
             0,
             0,
             2,
+            4,
             3,
             1,
             &mut,
@@ -139,9 +143,11 @@ int main(int argc, char *argv[]) {
             &cond3
     };
 
+    pthread_create(&client_com, NULL, &client_communication, &data);
     pthread_create(&server_player, NULL, &handle_server_player, &data);
     pthread_create(&server, NULL, &handle_game, &data);
 
+    pthread_join(client_com, NULL);
     pthread_join(server_player, NULL);
     pthread_join(server, NULL);
 
@@ -208,12 +214,155 @@ void connect_client(char *argv[]) {
     wait_opponent_to_start_game_screen();
 }
 
+void* client_communication(void* args) {
+    DATA * data = (DATA* ) args;
+
+    int direction_change_client = 4;
+
+
+    int len;
+    char buff[256];
+    int field1server[M][N];
+    int field2client[M][N];
+    bzero(buff,256);
+
+    while (1) {
+        len = read(newsockt, buff, 255);
+        if (strcmp(buff, "play") == 0) {
+            pthread_cond_broadcast(data->is_game_on);
+            break;
+        }
+    }
+
+    int i = 0;
+    int game_stat = 3;
+    while (game_stat == 3) {
+
+        for (int j = 0; j < M; ++j) {
+            for (int k = 0; k < N; ++k) {
+                field1server[j][k] = data->field_server[j][k];
+                field2client[j][k] = data->field_client[j][k];
+            }
+
+        }
+
+        pthread_mutex_lock(data->mut);
+        pthread_cond_wait(data->can_draw, data->mut);
+
+
+        /// Pocuvame klienta na zmeny pohybu
+
+        len = read(newsockt, &direction_change_client, sizeof(direction_change_client));
+        if (len < 0) {
+            perror("Error writing to socket");
+            break;
+        }
+        mvprintw(M+3, 0,"ND: %d  s krokom: %d", direction_change_client, ++i);
+        data->direction_change_client = direction_change_client;
+
+        n = write(newsockt, field1server, sizeof(field1server));
+        if (n < 0)
+        {
+            perror("Error writing to socket");
+            endwin();
+            exit(5);
+        }
+        usleep(1000);
+        n = write(newsockt, field2client, sizeof(field2client));
+        if (n < 0)
+        {
+            perror("Error writing to socket");
+            endwin();
+            exit(5);
+        }
+        usleep(1000);
+        n = write(newsockt, &data->head_server, sizeof(data->head_server));
+        if (n < 0)
+        {
+            perror("Error writing to socket");
+            endwin();
+            exit(5);
+        }
+        usleep(1000);
+        n = write(newsockt, &data->head_client, sizeof(data->head_client));
+        if (n < 0)
+        {
+            perror("Error writing to socket");
+            endwin();
+            exit(5);
+        }
+        usleep(1000);
+        n = write(newsockt, &data->score_server, sizeof(data->score_server));
+        if (n < 0)
+        {
+            perror("Error writing to socket");
+            endwin();
+            exit(5);
+        }
+        usleep(1000);
+        n = write(newsockt, &data->score_client, sizeof(data->score_client));
+        if (n < 0)
+        {
+            perror("Error writing to socket");
+            endwin();
+            exit(5);
+        }
+        usleep(1000);
+        n = write(newsockt, &data->fruit_x, sizeof(data->fruit_x));
+        if (n < 0)
+        {
+            perror("Error writing to socket");
+            endwin();
+            exit(5);
+        }
+        usleep(1000);
+        n = write(newsockt, &data->fruit_y, sizeof(data->fruit_y));
+        if (n < 0)
+        {
+            perror("Error writing to socket");
+            endwin();
+            exit(5);
+        }
+        usleep(1000);
+        n = write(newsockt, &data->fruit_value, sizeof(data->fruit_value));
+        if (n < 0)
+        {
+            perror("Error writing to socket");
+            endwin();
+            exit(5);
+        }
+        usleep(1000);
+        n = write(newsockt, &data->is_fruit_generated, sizeof(data->is_fruit_generated));
+        if (n < 0)
+        {
+            perror("Error writing to socket");
+            endwin();
+            exit(5);
+        }
+        usleep(1000);
+        n = write(newsockt, &data->game_status, sizeof(data->game_status));
+        if (n < 0)
+        {
+            perror("Error writing to socket");
+            endwin();
+            exit(5);
+        }
+
+
+        data->is_drawn = 1 ;
+        pthread_mutex_unlock(data->mut);
+        pthread_cond_signal(data->can_read);
+        }
+}
+
 void* handle_server_player(void* arg) {
     DATA* data = (DATA*) arg;
 
+    usleep(10);
     pthread_mutex_lock(data->mut);
     if (data->game_status == 3) {
         pthread_cond_wait(data->is_game_on, data->mut);
+
     }
     pthread_mutex_unlock(data->mut);
     int c = 0;
@@ -227,15 +376,10 @@ void* handle_server_player(void* arg) {
     int ch = 0;
     int i = 0;
     while(game_stat == 3) {
-        mvprintw(M + 1, 0, "Zaciatok kroku %d   ", ++i);
         ch = getch();
-        mvprintw(M + 7, 0, "Klavesa: %d   ", ch);
         pthread_mutex_lock(data->mut);
 
-        while (data->is_drawn == 1) {
-            pthread_cond_wait(data->can_draw, data->mut);
-        }
-
+        pthread_cond_wait(data->can_draw, data->mut);
         /// Get input
         if (ch != ERR) {
             c = ch;
@@ -280,8 +424,9 @@ void* handle_server_player(void* arg) {
         move(M + 3, 0);
         game_stat = data->game_status;
         data->is_drawn = 1;
-        pthread_mutex_unlock(data->mut);
         pthread_cond_broadcast(data->can_read);
+        pthread_mutex_unlock(data->mut);
+
         refresh();
     }
     refresh();
@@ -306,16 +451,14 @@ void* handle_server_player(void* arg) {
 
 void * handle_game(void* arg) {
     DATA* data = (DATA*) arg;
-    int len;
-    char buff[256];
-    bzero(buff,256);
-    while (1) {
-        len = read(newsockt, buff, 255);
-        if (strcmp(buff, "play") == 0) {
-            pthread_cond_signal(data->is_game_on);
-            break;
-        }
+
+    pthread_mutex_lock(data->mut);
+    if (data->game_status == 3) {
+        pthread_cond_wait(data->is_game_on, data->mut);
+        mvprintw(M + 7, 0 , "Som v handle game, som za podmienkou");
+        refresh();
     }
+    pthread_mutex_unlock(data->mut);
 
     int field1[M][N] = {0}; /// Pozicia pre hraca 1
     int field2[M][N] = {0}; /// Pozicia pre hraca 2
@@ -349,12 +492,15 @@ void * handle_game(void* arg) {
         field1[y_1][++j1 - head1] = i;
         field2[y2][j2++] = head2 - (i - 1);
     }
+
+
+
     while (play == 3) {
         pthread_mutex_lock(data->mut);
 
-        while (data->is_drawn == 0) {
-            pthread_cond_wait(data->can_read, data->mut);
-        }
+
+            //pthread_cond_wait(data->can_read, data->mut);
+
 
         //usleep(200000);
         //sleep(1);
@@ -365,6 +511,7 @@ void * handle_game(void* arg) {
         }*/
         ///Zmena hry
         direction_change_server = data->direction_change_server;
+        direction_change_client = data->direction_change_client;
 
         if (fruit_generated == 0) {
             fruit_x = (rand() % (N - 2) ) + 1;
@@ -532,78 +679,15 @@ void * handle_game(void* arg) {
         data->game_status = play;
 
         data->is_drawn = 0;
-
-        pthread_mutex_unlock(data->mut);
         pthread_cond_broadcast(data->can_draw);
+        pthread_mutex_unlock(data->mut);
+
         /// Struct medzi server a serverHracom field 1,2 score 1,2, fruit x,y
         /// Odosielame zmeny
         /*if (fruit_generated == 0) {
             generate_fruit();
-        }
-
-        n = write(newsockt, &x1, sizeof(x1));
-        if (n < 0)
-        {
-            perror("Error writing to socket");
-            endwin();
-            exit(5);
-        }
-        usleep(100);
-        n = write(newsockt, &y_1, sizeof(y_1));
-        if (n < 0)
-        {
-            perror("Error writing to socket");
-            endwin();
-            exit(5);
-        }
-        usleep(100);
-        n = write(newsockt, &head1, sizeof(head1));
-        if (n < 0)
-        {
-            perror("Error writing to socket");
-            endwin();
-            exit(5);
-        }
-        usleep(100);
-        n = write(newsockt, &tail1, sizeof(tail1));
-        if (n < 0)
-        {
-            perror("Error writing to socket");
-            endwin();
-            exit(5);
-        }
-        usleep(100);
-        n = write(newsockt, &current_score1, sizeof(current_score1));
-        if (n < 0)
-        {
-            perror("Error writing to socket");
-            endwin();
-            exit(5);
-        }
-        usleep(100);
-        n = write(newsockt, &fruit_x, sizeof(fruit_x));
-        if (n < 0)
-        {
-            perror("Error writing to socket");
-            endwin();
-            exit(5);
-        }
-        usleep(100);
-        n = write(newsockt, &fruit_y, sizeof(fruit_y));
-        if (n < 0)
-        {
-            perror("Error writing to socket");
-            endwin();
-            exit(5);
-        }
-        usleep(100);
-        n = write(newsockt, &fruit_value, sizeof(fruit_value));
-        if (n < 0)
-        {
-            perror("Error writing to socket");
-            endwin();
-            exit(5);
         }*/
+
         usleep(200000);
     }
 

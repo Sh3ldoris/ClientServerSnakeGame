@@ -43,6 +43,9 @@ struct hostent* server;
 
 char buffer[256];
 
+int ** server_field;
+int ** client_field;
+
 void draw_arena();
 int key_hit();
 void connect_to_server(char *argv[]);
@@ -66,6 +69,15 @@ void set_values(char args[256]);
 int send_message(char *message);
 
 int main(int argc, char *argv[]) {
+
+
+    server_field = malloc(M * sizeof(int *));
+    for (int i = 0; i < M; ++i)
+        server_field[i] = malloc(N * sizeof(int));
+
+    client_field = malloc(M * sizeof(int *));
+    for (int i = 0; i < M; ++i)
+        client_field[i] = malloc(N * sizeof(int));
 
     if (argc < 3) {
         fprintf(stderr,"usage %s hostname port\n", argv[0]);
@@ -127,9 +139,10 @@ int main(int argc, char *argv[]) {
 
 
     int c = 0;
-    int direction_change = direction;
+    int ch = 0;
+    int direction_change = 4;
 
-    snake_init();
+    //snake_init();
     draw_arena();
 
     /// Countdown from 3
@@ -137,71 +150,14 @@ int main(int argc, char *argv[]) {
 
 
     //get_info();
-
+usleep(1000);
     while(play) {
-        /*bzero(buffer,256);
-        n = read(sockfd, buffer, 255);
-        if (n < 0)
-        {
-            perror("Error reading from socket");
-            return 6;
-        }
 
-        mvprintw(M+4, 0, "Udaje zo servera: %s", buffer);*//*
-        int n = 0;
-        n = read(sockfd, &x2, sizeof(x2));
-        if (n < 0) {
-            perror("Error writing to socket");
-            return 6;
-        }
-        n = read(sockfd, &y2, sizeof(y2));
-        if (n < 0) {
-            perror("Error writing to socket");
-            return 6;
-        }
-        n = read(sockfd, &head2, sizeof(head2));
-        if (n < 0) {
-            perror("Error writing to socket");
-            return 6;
-        }
-
-        field2[y2][x2] = head2;
-
-        n = read(sockfd, &tail2, sizeof(tail2));
-        if (n < 0) {
-            perror("Error writing to socket");
-            return 6;
-        }
-        n = read(sockfd, &current_score2, sizeof(current_score2));
-        if (n < 0) {
-            perror("Error writing to socket");
-            return 6;
-        }
-        n = read(sockfd, &fruit_x, sizeof(fruit_x));
-        if (n < 0) {
-            perror("Error writing to socket");
-            return 6;
-        }
-        n = read(sockfd, &fruit_y, sizeof(fruit_y));
-        if (n < 0) {
-            perror("Error writing to socket");
-            return 6;
-        }
-        n = read(sockfd, &fruit_value, sizeof(fruit_value));
-        if (n < 0) {
-            perror("Error writing to socket");
-            return 6;
-        }*/
-
-
-        /// 1. Nastav udaje - zavolaj GET na server
-        //get_info();
-        /// 2. Posli udaje o sebe na server
-        //send_info();
 
         /// Get input
         if (key_hit()) {
             c = getch();
+            mvprintw(M+2, 0, "Ch:%d" , c);
             if (c == 97)
                 direction_change = 4;
             if (c == 100)
@@ -213,6 +169,101 @@ int main(int argc, char *argv[]) {
             if (c == 115)
                 direction_change = 3;
         }
+        mvprintw(M+3, 0, "Ch:%d" , direction_change);
+        usleep(200000);
+        n = write(sockfd, &direction_change, sizeof(direction_change));
+        if (n < 0)
+        {
+            perror("Error reading from socket");
+            return 6;
+        }
+
+       usleep(100);
+        n = read(sockfd, &field2, sizeof(field2));
+        if (n < 0)
+        {
+            perror("Error reading from socket");
+            return 6;
+        }
+
+        usleep(100);
+       // mvprintw(M+4, 0, "Udaje zo servera: %s", buffer);
+        int n = 0;
+        n = read(sockfd, &field1, sizeof(field1));
+        if (n < 0) {
+            perror("Error writing to socket");
+            return 6;
+        }
+        usleep(100);
+        n = read(sockfd, &head2, sizeof(head2));
+        if (n < 0) {
+            perror("Error writing to socket");
+            return 6;
+        }
+        usleep(100);
+        n = read(sockfd, &head1, sizeof(head1));
+        if (n < 0) {
+            perror("Error writing to socket");
+            return 6;
+        }
+        usleep(100);
+        n = read(sockfd, &current_score2, sizeof(current_score2));
+        if (n < 0) {
+            perror("Error writing to socket");
+            return 6;
+        }
+        usleep(100);
+        n = read(sockfd, &current_score1, sizeof(current_score1));
+        if (n < 0) {
+            perror("Error writing to socket");
+            return 6;
+        }
+        usleep(100);
+        n = read(sockfd, &fruit_x, sizeof(fruit_x));
+        if (n < 0) {
+            perror("Error writing to socket");
+            return 6;
+        }
+        usleep(100);
+        n = read(sockfd, &fruit_y, sizeof(fruit_y));
+        if (n < 0) {
+            perror("Error writing to socket");
+            return 6;
+        }
+        usleep(100);
+        n = read(sockfd, &fruit_value, sizeof(fruit_value));
+        if (n < 0) {
+            perror("Error writing to socket");
+            return 6;
+        }
+        usleep(100);
+        n = read(sockfd, &fruit_generated, sizeof(fruit_generated));
+        if (n < 0) {
+            perror("Error writing to socket");
+            return 6;
+        }
+        usleep(100);
+        n = read(sockfd, &play, sizeof(play));
+        if (n < 0) {
+            perror("Error writing to socket");
+            return 6;
+        }
+
+        /*for (int i = 0; i < M; ++i) {
+            for (int j = 0; j < N; ++j) {
+                field1[i][j] = client_field[i][j];
+                field2[i][j] = server_field[i][j];
+            }
+
+        }*/
+
+
+        /// 1. Nastav udaje - zavolaj GET na server
+        //get_info();
+        /// 2. Posli udaje o sebe na server
+        //send_info();
+
+
 
         mvprintw(M + 1, 45, "P1 : P2");
         mvprintw(M + 2, 45, "%d : %d ", x1,x2);
@@ -224,14 +275,14 @@ int main(int argc, char *argv[]) {
         mvprintw(M + 8, 45, "%d",fruit_y);
         mvprintw(M + 9, 45, "%d",game_status);
 
-        step(direction_change);
+        //step(direction_change);
 
         /// Print play_game area
         draw_game();
 
 
 
-        usleep(200000);
+        //usleep(200000);
     }
     refresh();
 
@@ -260,6 +311,13 @@ int main(int argc, char *argv[]) {
 
     close(sockfd);
     endwin();
+    for (int i = 0; i < N; ++i)
+        free(client_field[i]);
+    free(client_field);
+
+    for (int i = 0; i < N; ++i)
+        free(server_field[i]);
+    free(server_field);
     return 0;
 }
 
@@ -379,9 +437,9 @@ void snake_init() {
 void draw_game() {
     for(int i = 1; i <= M - 1; i++){
         for (int j = 1; j <= N - 1; j++) {
-            if (((field1[i][j] >= tail1) && (field1[i][j] < head1)) || ((field2[i][j] >= tail2) && (field2[i][j] < head2))) {
+            if (((field2[i][j] > 0) && (field2[i][j] < head2)) || ((field1[i][j] > 0) && (field1[i][j] < head1))) {
                 mvprintw(i, j, "o");
-            } else if ((field1[i][j] == head1) || (field2[i][j] == head2)) {
+            } else if ((field2[i][j] == head2) || (field1[i][j] == head1)) {
                 mvprintw(i, j, "x");
             } else if (fruit_generated == 1 && j == fruit_x && i == fruit_y) {
                 mvprintw(i, j, "%d",fruit_value);
@@ -393,6 +451,15 @@ void draw_game() {
     }
     mvprintw(M + 2, (N/2) - 17, "Your Score: %d  Opponent's Score: %d", current_score1, current_score2);
     move(M + 3, 0);
+
+    move(M + 10, 0);
+    for(int i = 1; i <= M - 1; i++){
+        for (int j = 1; j <= N - 1; j++) {
+            printw("%d", field2[i][j]);
+        }
+        printw("\n");
+    }
+    printw("\n");
     refresh();
 }
 
