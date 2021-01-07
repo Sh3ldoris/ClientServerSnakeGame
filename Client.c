@@ -59,6 +59,7 @@ void step(int change);
 void start_screen();
 void loser_screen();
 void winner_screen();
+void something_went_wrong_screen();
 void get_info();
 void send_info();
 void set_values(char args[256]);
@@ -112,6 +113,7 @@ int main(int argc, char *argv[]) {
 
     srand(time(NULL));
 
+
     start_screen();
     bzero(buffer,256);
     strcpy(buffer,"play");
@@ -121,6 +123,7 @@ int main(int argc, char *argv[]) {
         perror("Error writing to socket");
         return 5;
     }
+
 
 
     int c = 0;
@@ -236,10 +239,23 @@ int main(int argc, char *argv[]) {
 
     sleep(2);
 
+    /// CHANGE TO SWITCH
     if (current_score1 == 0)
         loser_screen();
     if (current_score1 > 0)
         winner_screen();
+    /*switch (game_stat) {
+        case 1:
+            winner_screen();
+            break;
+        case 2:
+            loser_screen();
+            break;
+        default:
+            something_went_wrong_screen();
+            break;
+    }*/
+
 
 
     close(sockfd);
@@ -613,6 +629,36 @@ void winner_screen() {
     }
     attr_off(COLOR_PAIR(1),0);
 
+}
+
+void something_went_wrong_screen() {
+    //system("clear");
+    draw_arena();
+    attr_on(COLOR_PAIR(3),0);
+    mvprintw(M/2 - 7, N/2 - 10,"         / \\   ");
+    mvprintw(M/2 - 6,  N/2 - 10,"        /   \\  ");
+    mvprintw(M/2 - 5,  N/2 - 10,"       /     \\");
+    mvprintw(M/2 - 4,  N/2 - 10,"      /   _   \\ ");
+    mvprintw(M/2 - 3,  N/2 - 10,"     /   | |   \\ ");
+    mvprintw(M/2 - 2,  N/2 - 10,"    /    | |    \\ ");
+    mvprintw(M/2 - 1,  N/2 - 10,"   /     |_|     \\ ");
+    mvprintw(M/2 ,  N/2 - 10,   "  /               \\ ");
+    mvprintw(M/2 + 1,  N/2 - 10," /        O        \\ ");
+    mvprintw(M/2 + 2,  N/2 - 10,"/___________________\\ ");
+    attr_off(COLOR_PAIR(3),0);
+
+    mvprintw(M/2 + 4,  N/2 - 13,"Ooops! Something went WRONG!");
+    mvprintw(M/2 + 5,  N/2 - 5, "We 're SORRY!");
+
+    mvprintw(M + 2, (N/2) - 16, "                                    ");
+    refresh();
+
+    attr_on(COLOR_PAIR(1),0);
+    while (getch() != '\n'){
+        mvprintw(M/2 + 6, N/2 - 13,"  Press ENTER to FINISH !");
+        move(M + 1, 0);
+    }
+    attr_off(COLOR_PAIR(1),0);
 }
 
 void get_info() {
