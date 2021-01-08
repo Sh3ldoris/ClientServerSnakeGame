@@ -33,7 +33,7 @@ int fruit_x = 10;
 int fruit_y = 7;
 int fruit_value = 0;
 
-int play = 1;
+int play = 3;
 int game_status = 0;
 
 int sockt, n;
@@ -150,104 +150,140 @@ int main(int argc, char *argv[]) {
 
 
     //get_info();
-usleep(1000);
-    while(play) {
+    mvprintw(M + 3, 0, "Game stat je: %d", play);
+    refresh();
+    while(play == 3) {
 
 
         /// Get input
         if (key_hit()) {
             c = getch();
-            mvprintw(M+2, 0, "Ch:%d" , c);
             if (c == 97)
                 direction_change = 4;
             if (c == 100)
                 direction_change = 2;
             if (c == 120)
-                play = 0;
+                direction_change = 0;
             if (c == 119)
                 direction_change = 1;
             if (c == 115)
                 direction_change = 3;
         }
-        mvprintw(M+3, 0, "Ch:%d" , direction_change);
-        usleep(200000);
+        usleep(100000);
         n = write(sockfd, &direction_change, sizeof(direction_change));
         if (n < 0)
         {
             perror("Error reading from socket");
             return 6;
         }
+        /*mvprintw(M + 3, 0, "Odoslal som dir");
+        refresh();
 
-       usleep(100);
+        usleep(100);*/
         n = read(sockfd, &field2, sizeof(field2));
         if (n < 0)
         {
             perror("Error reading from socket");
             return 6;
         }
+        /*mvprintw(M + 4, 0, "Prijal som pole 2");
+        refresh();
 
-        usleep(100);
-       // mvprintw(M+4, 0, "Udaje zo servera: %s", buffer);
-        int n = 0;
+        usleep(100);*/
         n = read(sockfd, &field1, sizeof(field1));
         if (n < 0) {
             perror("Error writing to socket");
             return 6;
         }
-        usleep(100);
+        /*mvprintw(M + 5, 0, "Prijal som pole 1");
+        refresh();
+
+        usleep(100);*/
         n = read(sockfd, &head2, sizeof(head2));
         if (n < 0) {
             perror("Error writing to socket");
             return 6;
         }
-        usleep(100);
+        /*mvprintw(M + 6, 0, "Prijal som hlavu 2");
+        refresh();
+
+        usleep(100);*/
         n = read(sockfd, &head1, sizeof(head1));
         if (n < 0) {
             perror("Error writing to socket");
             return 6;
         }
-        usleep(100);
+        /*mvprintw(M + 7, 0, "Prijal som hlavu 1");
+        refresh();
+
+        usleep(100);*/
         n = read(sockfd, &current_score2, sizeof(current_score2));
         if (n < 0) {
             perror("Error writing to socket");
             return 6;
         }
-        usleep(100);
+        /*mvprintw(M + 8, 0, "Prijal som score 2");
+        refresh();
+
+        usleep(100);*/
         n = read(sockfd, &current_score1, sizeof(current_score1));
         if (n < 0) {
             perror("Error writing to socket");
             return 6;
         }
-        usleep(100);
+        /*mvprintw(M + 9, 0, "Prijal som score 1");
+        refresh();
+
+        usleep(100);*/
         n = read(sockfd, &fruit_x, sizeof(fruit_x));
         if (n < 0) {
             perror("Error writing to socket");
             return 6;
         }
-        usleep(100);
+        /*mvprintw(M + 10, 0, "Prijal som fruit x");
+        refresh();
+
+        usleep(100);*/
         n = read(sockfd, &fruit_y, sizeof(fruit_y));
         if (n < 0) {
             perror("Error writing to socket");
             return 6;
         }
-        usleep(100);
+        /*mvprintw(M + 11, 0, "Prijal som fruit y");
+        refresh();
+
+        usleep(100);*/
         n = read(sockfd, &fruit_value, sizeof(fruit_value));
         if (n < 0) {
             perror("Error writing to socket");
             return 6;
         }
-        usleep(100);
+        /*mvprintw(M + 12, 0, "Prijal som fruit value");
+        refresh();
+
+        usleep(100);*/
         n = read(sockfd, &fruit_generated, sizeof(fruit_generated));
         if (n < 0) {
             perror("Error writing to socket");
             return 6;
         }
-        usleep(100);
+        /*mvprintw(M + 13, 0, "Prijal som is fruit");
+        refresh();
+
+        usleep(100);*/
         n = read(sockfd, &play, sizeof(play));
         if (n < 0) {
             perror("Error writing to socket");
             return 6;
         }
+        /*mvprintw(M + 14, 0, "Prijal som game stat");
+        refresh();*/
+
+        /*for (int i = 3; i < 15; ++i) {
+            mvprintw(M+i, 0, "                                 ");
+        }
+        refresh();*/
+
 
         /*for (int i = 0; i < M; ++i) {
             for (int j = 0; j < N; ++j) {
@@ -262,21 +298,6 @@ usleep(1000);
         //get_info();
         /// 2. Posli udaje o sebe na server
         //send_info();
-        mvprintw(M + 5, 0, "Head Klient: %d", head1);
-        mvprintw(M + 6, 0, "Head Server: %d", head2);
-
-
-        mvprintw(M + 1, 45, "P1 : P2");
-        mvprintw(M + 2, 45, "%d : %d ", x1,x2);
-        mvprintw(M + 3, 45, "%d : %d ",y_1,y2);
-        mvprintw(M + 4, 45, "%d : %d",head1,head2);
-        mvprintw(M + 5, 45, "%d : %d",tail1,tail2);
-        mvprintw(M + 6, 45, "%d : %d",current_score1,current_score2);
-        mvprintw(M + 7, 45, "%d",fruit_x);
-        mvprintw(M + 8, 45, "%d",fruit_y);
-        mvprintw(M + 9, 45, "%d",game_status);
-
-        //step(direction_change);
 
         /// Print play_game area
         draw_game();
@@ -290,23 +311,17 @@ usleep(1000);
     draw_game_over();
 
     sleep(2);
-
-    /// CHANGE TO SWITCH
-    if (current_score1 == 0)
-        loser_screen();
-    if (current_score1 > 0)
-        winner_screen();
-    /*switch (game_stat) {
-        case 1:
+    switch (play) {
+        case 2:
             winner_screen();
             break;
-        case 2:
+        case 1:
             loser_screen();
             break;
         default:
             something_went_wrong_screen();
             break;
-    }*/
+    }
 
 
 
@@ -440,7 +455,6 @@ void draw_game() {
             if (((field2[i][j] > 0) && (field2[i][j] < head2)) || ((field1[i][j] > 0) && (field1[i][j] < head1))) {
                 mvprintw(i, j, "o");
             } else if ((field2[i][j] == head2) || (field1[i][j] == head1)) {
-                mvprintw(M+6, 0, "Vykreslujem hlavu");
                 mvprintw(i, j, "x");
             } else if (fruit_generated == 1 && j == fruit_x && i == fruit_y) {
                 mvprintw(i, j, "%d",fruit_value);
@@ -454,13 +468,13 @@ void draw_game() {
     move(M + 3, 0);
 
     move(M + 10, 0);
-    for(int i = 1; i <= M - 1; i++){
+    /*for(int i = 1; i <= M - 1; i++){
         for (int j = 1; j <= N - 1; j++) {
             printw("%d", field2[i][j]);
         }
         printw("\n");
     }
-    printw("\n");
+    printw("\n");*/
     refresh();
 }
 
@@ -626,16 +640,9 @@ void start_screen() {
         move(M + 1, 0);
         refresh();
         sleep(1);
-
     }
 
-    /*if (send_message("play") < 0) {
-        endwin();
-        exit(5);
-    }
-*/
     attr_off(COLOR_PAIR(4),0);
-    play = 1;
 
 }
 

@@ -263,92 +263,82 @@ void* client_communication(void* args) {
         mvprintw(M+3, 0,"ND: %d  s krokom: %d", direction_change_client, ++i);
         data->direction_change_client = direction_change_client;
 
+        usleep(1000);
         n = write(newsockt, field1server, sizeof(field1server));
         if (n < 0)
         {
             perror("Error writing to socket");
-            endwin();
-            exit(5);
+            break;
         }
         usleep(1000);
         n = write(newsockt, field2client, sizeof(field2client));
         if (n < 0)
         {
             perror("Error writing to socket");
-            endwin();
-            exit(5);
+            break;
         }
         usleep(1000);
         n = write(newsockt, &data->head_server, sizeof(data->head_server));
         if (n < 0)
         {
             perror("Error writing to socket");
-            endwin();
-            exit(5);
+            break;
         }
         usleep(1000);
         n = write(newsockt, &data->head_client, sizeof(data->head_client));
         if (n < 0)
         {
             perror("Error writing to socket");
-            endwin();
-            exit(5);
+            break;
         }
         usleep(1000);
         n = write(newsockt, &data->score_server, sizeof(data->score_server));
         if (n < 0)
         {
             perror("Error writing to socket");
-            endwin();
-            exit(5);
+            break;
         }
         usleep(1000);
         n = write(newsockt, &data->score_client, sizeof(data->score_client));
         if (n < 0)
         {
             perror("Error writing to socket");
-            endwin();
-            exit(5);
+            break;
         }
         usleep(1000);
         n = write(newsockt, &data->fruit_x, sizeof(data->fruit_x));
         if (n < 0)
         {
             perror("Error writing to socket");
-            endwin();
-            exit(5);
+            break;
         }
         usleep(1000);
         n = write(newsockt, &data->fruit_y, sizeof(data->fruit_y));
         if (n < 0)
         {
             perror("Error writing to socket");
-            endwin();
-            exit(5);
+            break;
         }
         usleep(1000);
         n = write(newsockt, &data->fruit_value, sizeof(data->fruit_value));
         if (n < 0)
         {
             perror("Error writing to socket");
-            endwin();
-            exit(5);
+            break;
         }
         usleep(1000);
         n = write(newsockt, &data->is_fruit_generated, sizeof(data->is_fruit_generated));
         if (n < 0)
         {
             perror("Error writing to socket");
-            endwin();
-            exit(5);
+            break;
         }
         usleep(1000);
         n = write(newsockt, &data->game_status, sizeof(data->game_status));
         if (n < 0)
         {
             perror("Error writing to socket");
-            endwin();
-            exit(5);
+            break;
         }
 
         data->is_drawn++;
@@ -359,6 +349,15 @@ void* client_communication(void* args) {
             pthread_cond_signal(data->can_read);
         }
     }
+
+    mvprintw(M+8, 0, "Ahooooooj");
+    if ((data->game_status != 1) || (data->game_status != 2)) {
+        pthread_mutex_lock(data->mut);
+        data->game_status = 0;
+        pthread_mutex_unlock(data->mut);
+    }
+    sleep(10);
+
 }
 
 void* handle_server_player(void* arg) {
@@ -368,7 +367,6 @@ void* handle_server_player(void* arg) {
     pthread_mutex_lock(data->mut);
     if (data->game_status == 3) {
         pthread_cond_wait(data->is_game_on, data->mut);
-
     }
     pthread_mutex_unlock(data->mut);
     int c = 0;
@@ -609,6 +607,7 @@ void * handle_game(void* arg) {
                 direction_client = 4;
                 break;
             default:
+                play = 0;
                 break;
         }
 
