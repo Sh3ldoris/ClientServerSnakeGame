@@ -262,7 +262,8 @@ usleep(1000);
         //get_info();
         /// 2. Posli udaje o sebe na server
         //send_info();
-
+        mvprintw(M + 5, 0, "Head Klient: %d", head1);
+        mvprintw(M + 6, 0, "Head Server: %d", head2);
 
 
         mvprintw(M + 1, 45, "P1 : P2");
@@ -419,7 +420,6 @@ void play_game() {
         loser_screen();
     if (current_score1 > 0)
         winner_screen();
-
 }
 
 /**
@@ -440,6 +440,7 @@ void draw_game() {
             if (((field2[i][j] > 0) && (field2[i][j] < head2)) || ((field1[i][j] > 0) && (field1[i][j] < head1))) {
                 mvprintw(i, j, "o");
             } else if ((field2[i][j] == head2) || (field1[i][j] == head1)) {
+                mvprintw(M+6, 0, "Vykreslujem hlavu");
                 mvprintw(i, j, "x");
             } else if (fruit_generated == 1 && j == fruit_x && i == fruit_y) {
                 mvprintw(i, j, "%d",fruit_value);

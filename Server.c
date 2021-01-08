@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
             2,
             4,
             3,
-            1,
+            2,
             &mut,
             &cond1,
             &cond2,
@@ -218,7 +218,7 @@ void* client_communication(void* args) {
     DATA * data = (DATA* ) args;
 
     int direction_change_client = 4;
-
+    int drawn_already = 0;
 
     int len;
     char buff[256];
@@ -238,6 +238,13 @@ void* client_communication(void* args) {
     int game_stat = 3;
     while (game_stat == 3) {
 
+        pthread_mutex_lock(data->mut);
+
+        if (data->is_drawn == 2 || drawn_already == 1) {
+            drawn_already = 0;
+            pthread_cond_wait(data->can_draw, data->mut);
+        }
+
         for (int j = 0; j < M; ++j) {
             for (int k = 0; k < N; ++k) {
                 field1server[j][k] = data->field_server[j][k];
@@ -245,10 +252,6 @@ void* client_communication(void* args) {
             }
 
         }
-
-        pthread_mutex_lock(data->mut);
-        pthread_cond_wait(data->can_draw, data->mut);
-
 
         /// Pocuvame klienta na zmeny pohybu
 
@@ -348,11 +351,15 @@ void* client_communication(void* args) {
             exit(5);
         }
 
-
-        data->is_drawn = 1 ;
+        sleep(3);
+        data->is_drawn++;
+        drawn_already = 1;
         pthread_mutex_unlock(data->mut);
-        pthread_cond_signal(data->can_read);
+
+        if (data->is_drawn == 2) {
+            pthread_cond_signal(data->can_read);
         }
+    }
 }
 
 void* handle_server_player(void* arg) {
@@ -367,7 +374,7 @@ void* handle_server_player(void* arg) {
     pthread_mutex_unlock(data->mut);
     int c = 0;
     int direction_change = 2;
-
+    int drawn_already = 0;
 
     draw_arena();
     /// Countdown from 3
@@ -379,7 +386,10 @@ void* handle_server_player(void* arg) {
         ch = getch();
         pthread_mutex_lock(data->mut);
 
-        pthread_cond_wait(data->can_draw, data->mut);
+        if (data->is_drawn == 2 || drawn_already == 1) {
+            drawn_already = 0;
+            pthread_cond_wait(data->can_draw, data->mut);
+        }
         /// Get input
         if (ch != ERR) {
             c = ch;
@@ -395,6 +405,9 @@ void* handle_server_player(void* arg) {
                 direction_change = 3;
         }
         data->direction_change_server = direction_change;
+
+        mvprintw(M + 5, 0, "Head Klient: %d", data->head_client);
+        mvprintw(M + 6, 0, "Head Server: %d", data->head_server);
 
         for(int i = 1; i <= M - 1; i++){
             for (int j = 1; j <= N - 1; j++) {
@@ -423,9 +436,13 @@ void* handle_server_player(void* arg) {
         mvprintw(M + 2, (N/2) - 17, "Your Score: %d  Opponent's Score: %d", data->score_server, data->score_client);
         move(M + 3, 0);
         game_stat = data->game_status;
-        data->is_drawn = 1;
-        pthread_cond_broadcast(data->can_read);
+        data->is_drawn++;
+        drawn_already = 1;
         pthread_mutex_unlock(data->mut);
+
+        if (data->is_drawn == 2) {
+            pthread_cond_signal(data->can_read);
+        }
 
         refresh();
     }
@@ -499,7 +516,9 @@ void * handle_game(void* arg) {
         pthread_mutex_lock(data->mut);
 
 
-            //pthread_cond_wait(data->can_read, data->mut);
+        if (data->is_drawn  < 2) {
+            pthread_cond_wait(data->can_read, data->mut);
+        }
 
 
         //usleep(200000);
