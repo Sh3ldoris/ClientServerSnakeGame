@@ -351,7 +351,6 @@ void* client_communication(void* args) {
             exit(5);
         }
 
-        sleep(3);
         data->is_drawn++;
         drawn_already = 1;
         pthread_mutex_unlock(data->mut);
