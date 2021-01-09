@@ -86,25 +86,23 @@ int main(int argc, char *argv[]) {
     pthread_join(server_player, NULL);
     pthread_join(server, NULL);
 
+    pthread_cond_destroy(&cond1);
+    pthread_cond_destroy(&cond2);
+    pthread_cond_destroy(&cond3);
+    pthread_mutex_destroy(&mut);
 
-    //end:
-        pthread_cond_destroy(&cond1);
-        pthread_cond_destroy(&cond2);
-        pthread_cond_destroy(&cond3);
-        pthread_mutex_destroy(&mut);
+    for (int i = 0; i < M; ++i)
+        free(data.field_server[i]);
+    free(data.field_server);
 
-        for (int i = 0; i < M; ++i)
-            free(data.field_server[i]);
-        free(data.field_server);
+    for (int i = 0; i < M; ++i)
+        free(data.field_client[i]);
+    free(data.field_client);
 
-        for (int i = 0; i < M; ++i)
-            free(data.field_client[i]);
-        free(data.field_client);
-
-        close(newsockt);
-        close(sockt);
-        system("clear");
-        endwin();
+    close(newsockt);
+    close(sockt);
+    system("clear");
+    endwin();
 
     return 0;
 }
@@ -349,7 +347,7 @@ void *handle_server_player(void *arg) {
                     mvprintw(i, j, "x");
                     attr_off(COLOR_PAIR(4), 0 );
                 }
-                else if (data->is_fruit_generated == 1 && j == data->fruit_x && i == data->fruit_y) {
+                else if (data->is_fruit_generated == 1 && j == data->fruit_x && i == data->fruit_y && was_countdown == 1) {
                     mvprintw(i, j, "%d", data->fruit_value);
                 } else {
                     mvprintw(i, j, " ");

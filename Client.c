@@ -43,8 +43,6 @@ int main(int argc, char *argv[]) {
         return 4;
     }
 
-    signal(SIGINT, signal_callback_handler);
-
     initscr();
     cbreak();
     noecho();
@@ -74,7 +72,7 @@ int main(int argc, char *argv[]) {
 
     int c = 0;
     int direction_change = 4;
-    int was_countdown = 0;
+    was_countdown = 0;
     int pressed_x = 0;
 
     draw_arena();
@@ -223,12 +221,6 @@ int key_hit() {
     }
 }
 
-void signal_callback_handler (int signum) {
-    close(sockfd);
-    endwin();
-    exit(signum);
-}
-
 void draw_game() {
     for (int i = 1; i <= M - 1; i++) {
         for (int j = 1; j <= N - 1; j++) {
@@ -250,7 +242,7 @@ void draw_game() {
                 mvprintw(i, j, "x");
                 attr_off(COLOR_PAIR(4), 0);
             }
-            else if (fruit_generated == 1 && j == fruit_x && i == fruit_y) {
+            else if (fruit_generated == 1 && j == fruit_x && i == fruit_y && was_countdown == 1) {
                 mvprintw(i, j, "%d", fruit_value);
             } else {
                 mvprintw(i, j, " ");

@@ -24,13 +24,14 @@ int game_status = 3;
 
 int sockt, n;
 int sockfd;
+int was_countdown;
 struct sockaddr_in serv_addr;
 struct hostent *server;
 
 
 char buffer[256];
 
-void signal_callback_handler(int signum);
+void force_end_handler(int signum);
 
 void draw_arena();
 
