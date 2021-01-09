@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <string.h>
+#include <signal.h>
 #include "Client.h"
 
 int main(int argc, char *argv[]) {
@@ -41,6 +42,8 @@ int main(int argc, char *argv[]) {
         perror("Error connecting to socket");
         return 4;
     }
+
+    signal(SIGINT, signal_callback_handler);
 
     initscr();
     cbreak();
@@ -218,6 +221,12 @@ int key_hit() {
     } else {
         return 0;
     }
+}
+
+void signal_callback_handler (int signum) {
+    close(sockfd);
+    endwin();
+    exit(signum);
 }
 
 void draw_game() {

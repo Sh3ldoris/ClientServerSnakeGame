@@ -273,8 +273,16 @@ void *client_communication(void *args) {
             pthread_cond_signal(data->can_read);
     }
 
-    mvprintw(M+4, 0, "Klient koniec");
-    refresh();
+    if (data->game_status == 3) {
+        pthread_mutex_lock(data->mut);
+        data->game_status = 0;
+        data->is_drawn++;
+        pthread_mutex_unlock(data->mut);
+
+        if (data->is_drawn == 2)
+            pthread_cond_signal(data->can_read);
+    }
+
     return NULL;
 }
 
@@ -585,6 +593,11 @@ void *handle_game(void *arg) {
         tail1++;
         tail2++;
 
+        if (data->score_server >= winning_score)
+            data->game_status = 1;
+        if (data->score_client >= winning_score)
+            data->game_status = 2;
+
         data->is_drawn = 0;
 
         pthread_mutex_unlock(data->mut);
@@ -595,7 +608,6 @@ void *handle_game(void *arg) {
             usleep(200000);
         }
     }
-    mvprintw(M+3, 0, "Koniec server");
     refresh();
 
     return NULL;

@@ -5,6 +5,7 @@
 /// Rozmery plochy
 #define N  50
 #define M  18
+#define winning_score  30
 
 typedef struct game_data {
     int **field_server;

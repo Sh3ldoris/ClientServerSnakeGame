@@ -30,6 +30,8 @@ struct hostent *server;
 
 char buffer[256];
 
+void signal_callback_handler(int signum);
+
 void draw_arena();
 
 int key_hit();
