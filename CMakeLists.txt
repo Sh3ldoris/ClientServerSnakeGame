@@ -9,7 +9,8 @@ find_package(Curses REQUIRED)
 include_directories(${CURSES_INCLUDE_DIR})
 
 
-add_executable(SnakeGame-Server Server.c)
+add_executable(SnakeGame-Server Server.c Server.h)
+add_executable(SnakeGame-Client Client.c Client.h)
 target_link_libraries(SnakeGame-Server ${CURSES_LIBRARIES})
 
 project(SnakeGame-Client C)
@@ -21,6 +22,4 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread")
 find_package(Curses REQUIRED)
 include_directories(${CURSES_INCLUDE_DIR})
 
-
-add_executable(SnakeGame-Client Client.c)
 target_link_libraries(SnakeGame-Client ${CURSES_LIBRARIES})
