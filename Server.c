@@ -295,11 +295,10 @@ void *handle_server_player(void *arg) {
 
     int c = 0;
     int drawn_already = 0;
-    int was_countdown = 0;
+    int was_countdown = 1;
     int pressed_x = 0;
 
     draw_arena();
-    //countdown();
 
     while(data->game_status == 3) {
         c = getch(); /// Get input
@@ -363,7 +362,7 @@ void *handle_server_player(void *arg) {
 
         pthread_mutex_unlock(data->mut);
 
-        if (was_countdown == 0) {
+        /*if (was_countdown == 0) {
             was_countdown = 1;
             drawn_already = 0;
             for (int i = 3; i > 0; --i) {
@@ -374,7 +373,7 @@ void *handle_server_player(void *arg) {
                 refresh();
                 sleep(1);
             }
-        }
+        }*/
 
         if (data->is_drawn == 2) {
             pthread_cond_signal(data->can_read);

@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
 
     int c = 0;
     int direction_change = 4;
-    was_countdown = 0;
+    was_countdown = 1;
     int pressed_x = 0;
 
     draw_arena();
@@ -172,7 +172,7 @@ int main(int argc, char *argv[]) {
 
         draw_game();
 
-        if (was_countdown == 0) {
+        /*if (was_countdown == 0) {
             was_countdown = 1;
             for (int i = 3; i > 0; --i) {
                 attr_on(COLOR_PAIR(3),0);
@@ -182,7 +182,7 @@ int main(int argc, char *argv[]) {
                 refresh();
                 sleep(1);
             }
-        }
+        }*/
     }
 
     close(sockfd);
