@@ -87,23 +87,24 @@ int main(int argc, char *argv[]) {
     pthread_join(server, NULL);
 
 
-    pthread_cond_destroy(&cond1);
-    pthread_cond_destroy(&cond2);
-    pthread_cond_destroy(&cond3);
-    pthread_mutex_destroy(&mut);
+    //end:
+        pthread_cond_destroy(&cond1);
+        pthread_cond_destroy(&cond2);
+        pthread_cond_destroy(&cond3);
+        pthread_mutex_destroy(&mut);
 
-    for (int i = 0; i < M; ++i)
-        free(data.field_server[i]);
-    free(data.field_server);
+        for (int i = 0; i < M; ++i)
+            free(data.field_server[i]);
+        free(data.field_server);
 
-    for (int i = 0; i < M; ++i)
-        free(data.field_client[i]);
-    free(data.field_client);
+        for (int i = 0; i < M; ++i)
+            free(data.field_client[i]);
+        free(data.field_client);
 
-    close(newsockt);
-    close(sockt);
-    system("clear");
-    endwin();
+        close(newsockt);
+        close(sockt);
+        system("clear");
+        endwin();
 
     return 0;
 }
@@ -271,6 +272,10 @@ void *client_communication(void *args) {
         if (data->is_drawn == 2)
             pthread_cond_signal(data->can_read);
     }
+
+    mvprintw(M+4, 0, "Klient koniec");
+    refresh();
+    return NULL;
 }
 
 void *handle_server_player(void *arg) {
@@ -284,19 +289,21 @@ void *handle_server_player(void *arg) {
 
     int c = 0;
     int drawn_already = 0;
+    int was_countdown = 0;
+    int pressed_x = 0;
 
     draw_arena();
     //countdown();
 
-    while (data->game_status == 3) {
+    while(data->game_status == 3) {
         c = getch(); /// Get input
 
         pthread_mutex_lock(data->mut);
 
         if (data->is_drawn == 2 || drawn_already == 1) {
-            drawn_already = 0;
             pthread_cond_wait(data->can_draw, data->mut);
         }
+        drawn_already = 0;
 
         /// Check input
         if (c != ERR) {
@@ -304,8 +311,10 @@ void *handle_server_player(void *arg) {
                 data->direction_change_server = 4;
             if (c == 100)
                 data->direction_change_server = 2;
-            if (c == 120)
+            if (c == 120) {
+                pressed_x = 1;
                 data->direction_change_server = 0;
+            }
             if (c == 119)
                 data->direction_change_server = 1;
             if (c == 115)
@@ -348,28 +357,44 @@ void *handle_server_player(void *arg) {
 
         pthread_mutex_unlock(data->mut);
 
-        if (data->is_drawn == 2)
+        if (was_countdown == 0) {
+            was_countdown = 1;
+            drawn_already = 0;
+            for (int i = 3; i > 0; --i) {
+                attr_on(COLOR_PAIR(3),0);
+                mvprintw(M / 2, (N/2), "%d", i);
+                move(M + 1,0);
+                attr_off(COLOR_PAIR(3),0);
+                refresh();
+                sleep(1);
+            }
+        }
+
+        if (data->is_drawn == 2) {
             pthread_cond_signal(data->can_read);
+        }
 
         refresh();
     }
 
-    refresh();
-
-    draw_game_over();
-
-    sleep(2);
-
     switch (data->game_status) {
         case 1:
+            draw_game_over();
+            sleep(2);
             winner_screen();
             break;
         case 2:
+            draw_game_over();
+            sleep(2);
             loser_screen();
             break;
         default:
-            mvprintw(M + 4, 0, "Game status je: %d", data->game_status);
-            opponent_left_screen();
+            if (pressed_x == 1) {
+                you_left_screen();
+            } else
+                opponent_left_screen();
+            system("clear");
+            sleep(1);
             break;
     }
 
@@ -445,6 +470,7 @@ void *handle_game(void *arg) {
                 direction_server = 4;
                 break;
             default:
+                data->game_status = 0;
                 break;
         }
 
@@ -491,8 +517,7 @@ void *handle_game(void *arg) {
                 direction_client = 4;
                 break;
             default:
-                //TODO: Rethink this
-                //data->game_status = 0;
+                data->game_status = 0;
                 break;
         }
 
@@ -566,8 +591,12 @@ void *handle_game(void *arg) {
 
         pthread_cond_broadcast(data->can_draw);
 
-        usleep(200000);
+        if (data->game_status == 3) {
+            usleep(200000);
+        }
     }
+    mvprintw(M+3, 0, "Koniec server");
+    refresh();
 
     return NULL;
 }
@@ -608,7 +637,6 @@ void draw_game_over() {
 }
 
 void countdown() {
-    //draw_game();
     for (int i = 3; i > 0; --i) {
         attr_on(COLOR_PAIR(3), 0);
         mvprintw(M / 2, (N / 2), "%d", i);

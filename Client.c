@@ -71,13 +71,12 @@ int main(int argc, char *argv[]) {
 
     int c = 0;
     int direction_change = 4;
+    int was_countdown = 0;
+    int pressed_x = 0;
 
     draw_arena();
 
-    /// Countdown from 3
-    //countdown();
-
-    while (game_status == 3) {
+    while(game_status == 3) {
 
         /// Get input
         if (key_hit()) {
@@ -86,8 +85,10 @@ int main(int argc, char *argv[]) {
                 direction_change = 4;
             if (c == 100)
                 direction_change = 2;
-            if (c == 120)
+            if (c == 120) {
+                pressed_x = 1;
                 direction_change = 0;
+            }
             if (c == 119)
                 direction_change = 1;
             if (c == 115)
@@ -170,25 +171,39 @@ int main(int argc, char *argv[]) {
 
         draw_game();
 
-    }
-
-    draw_game_over();
-
-    sleep(2);
-
-    switch (game_status) {
-        case 2:
-            winner_screen();
-            break;
-        case 1:
-            loser_screen();
-            break;
-        default:
-            you_left_screen();
-            break;
+        if (was_countdown == 0) {
+            was_countdown = 1;
+            for (int i = 3; i > 0; --i) {
+                attr_on(COLOR_PAIR(3),0);
+                mvprintw(M / 2, (N/2), "%d", i);
+                move(M + 1,0);
+                attr_off(COLOR_PAIR(3),0);
+                refresh();
+                sleep(1);
+            }
+        }
     }
 
     close(sockfd);
+
+    switch (game_status) {
+        case 2:
+            draw_game_over();
+            sleep(2);
+            winner_screen();
+            break;
+        case 1:
+            draw_game_over();
+            sleep(2);
+            loser_screen();
+            break;
+        default:
+            if (pressed_x == 1) {
+                you_left_screen();
+            } else
+                opponent_left_screen();
+            break;
+    }
     endwin();
 
     return 0;
@@ -276,7 +291,7 @@ void draw_game_over() {
 }
 
 void countdown() {
-    draw_arena();
+    //draw_game();
     for (int i = 3; i > 0; --i) {
         attr_on(COLOR_PAIR(3), 0);
         mvprintw(M / 2, (N / 2), "%d", i);
