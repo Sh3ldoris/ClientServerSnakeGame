@@ -354,7 +354,12 @@ void *handle_server_player(void *arg) {
             }
         }
 
-        mvprintw(M + 2, (N / 2) - 17, "Your Score: %d  Opponent's Score: %d", data->score_server, data->score_client);
+        attron(COLOR_PAIR(5));
+        mvprintw(M + 2, (N / 2) - 17, "Your Score: %d ", data->score_server);
+        attroff(COLOR_PAIR(5));
+        attron(COLOR_PAIR(4));
+        mvprintw(M + 2, (N / 2), "Opponent's Score: %d ", data->score_client);
+        attroff(COLOR_PAIR(4));
         move(M + 3, 0);
 
         data->is_drawn++;
@@ -366,10 +371,10 @@ void *handle_server_player(void *arg) {
             was_countdown = 1;
             drawn_already = 0;
             for (int i = 3; i > 0; --i) {
-                attr_on(COLOR_PAIR(3),0);
+                attron(COLOR_PAIR(3));
                 mvprintw(M / 2, (N/2), "%d", i);
                 move(M + 1,0);
-                attr_off(COLOR_PAIR(3),0);
+                attroff(COLOR_PAIR(3));
                 refresh();
                 sleep(1);
             }

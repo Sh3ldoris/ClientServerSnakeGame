@@ -175,10 +175,10 @@ int main(int argc, char *argv[]) {
         /*if (was_countdown == 0) {
             was_countdown = 1;
             for (int i = 3; i > 0; --i) {
-                attron(COLOR_PAIR(3),0);
+                attron(COLOR_PAIR(3));
                 mvprintw(M / 2, (N/2), "%d", i);
                 move(M + 1,0);
-                attroff(COLOR_PAIR(3),0);
+                attroff(COLOR_PAIR(3));
                 refresh();
                 sleep(1);
             }
@@ -250,7 +250,13 @@ void draw_game() {
         }
     }
 
-    mvprintw(M + 2, (N / 2) - 17, "Your Score: %d  Opponent's Score: %d", current_score1, current_score2);
+
+    attron(COLOR_PAIR(4));
+    mvprintw(M + 2, (N / 2) - 17, "Your Score: %d ", current_score1);
+    attroff(COLOR_PAIR(4));
+    attron(COLOR_PAIR(5));
+    mvprintw(M + 2, (N / 2), "Opponent's Score: %d ", current_score2);
+    attroff(COLOR_PAIR(5));
     move(M + 3, 0);
 
     refresh();
