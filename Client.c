@@ -49,6 +49,7 @@ int main(int argc, char *argv[]) {
     nodelay(stdscr, TRUE);
     scrollok(stdscr, TRUE);
 
+
     /// color pairs used for color graphics
     start_color();
     init_pair(1, COLOR_GREEN, COLOR_BLACK);
@@ -112,61 +113,61 @@ int main(int argc, char *argv[]) {
 
         n = read(sockfd, &field1, sizeof(field1));
         if (n < 0) {
-            perror("Error writing to socket");
+            perror("Error reading from socket");
             return 6;
         }
 
         n = read(sockfd, &head2, sizeof(head2));
         if (n < 0) {
-            perror("Error writing to socket");
+            perror("Error reading from socket");
             return 6;
         }
 
         n = read(sockfd, &head1, sizeof(head1));
         if (n < 0) {
-            perror("Error writing to socket");
+            perror("Error reading from socket");
             return 6;
         }
 
         n = read(sockfd, &current_score2, sizeof(current_score2));
         if (n < 0) {
-            perror("Error writing to socket");
+            perror("Error reading from socket");
             return 6;
         }
 
         n = read(sockfd, &current_score1, sizeof(current_score1));
         if (n < 0) {
-            perror("Error writing to socket");
+            perror("Error reading from socket");
             return 6;
         }
 
         n = read(sockfd, &fruit_x, sizeof(fruit_x));
         if (n < 0) {
-            perror("Error writing to socket");
+            perror("Error reading from socket");
             return 6;
         }
 
         n = read(sockfd, &fruit_y, sizeof(fruit_y));
         if (n < 0) {
-            perror("Error writing to socket");
+            perror("Error reading from socket");
             return 6;
         }
 
         n = read(sockfd, &fruit_value, sizeof(fruit_value));
         if (n < 0) {
-            perror("Error writing to socket");
+            perror("Error reading from socket");
             return 6;
         }
 
         n = read(sockfd, &fruit_generated, sizeof(fruit_generated));
         if (n < 0) {
-            perror("Error writing to socket");
+            perror("Error reading from socket");
             return 6;
         }
 
         n = read(sockfd, &game_status, sizeof(game_status));
         if (n < 0) {
-            perror("Error writing to socket");
+            perror("Error reading from socket");
             return 6;
         }
 
@@ -206,7 +207,6 @@ int main(int argc, char *argv[]) {
             break;
     }
     endwin();
-
     return 0;
 }
 
@@ -258,7 +258,6 @@ void draw_game() {
     mvprintw(M + 2, (N / 2), "Opponent's Score: %d ", current_score2);
     attroff(COLOR_PAIR(5));
     move(M + 3, 0);
-
     refresh();
 }
 
