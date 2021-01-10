@@ -103,7 +103,6 @@ int main(int argc, char *argv[]) {
     close(sockt);
     system("clear");
     endwin();
-
     return 0;
 }
 
